@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
   billingEnabled: true,
   hostedEnrollmentEnabled: true,
   dedicatedPilotOrgs: "",
+  sharedPilotOrgs: "",
   forward: vi.fn(),
   grants: "{}",
   engines: "[]",
@@ -66,6 +67,7 @@ vi.mock("@repo/platform/engine/config/env", async (original) => {
       get OPENSHIP_MAIL_HOSTED_ENROLLMENT_ENABLED() {
         return h.hostedEnrollmentEnabled;
       },
+      get OPENSHIP_MAIL_SHARED_PILOT_ORGS() { return h.sharedPilotOrgs; },
       get OPENSHIP_MAIL_DEDICATED_PILOT_ORGS() { return h.dedicatedPilotOrgs; },
       get BILLING_ENABLED() {
         return h.billingEnabled;
@@ -141,6 +143,7 @@ beforeEach(() => {
   h.billingEnabled = true;
   h.hostedEnrollmentEnabled = true;
   h.dedicatedPilotOrgs = "";
+  h.sharedPilotOrgs = "";
   h.engines = "[]";
   h.fleet = undefined;
   h.grants = "{}";
@@ -737,6 +740,14 @@ it("routes two Cloud organizations to one shared worker with different sending a
       return Response.json({ domains: [{ domain: `tenant-${i}.test` }] });
     }),
   );
+  h.hostedEnrollmentEnabled = false;
+  h.sharedPilotOrgs = owners[0].orgId;
+  expect(await (await call(owners[0], "/managed")).json()).toMatchObject({ hostedEnrollmentEnabled: false, hostingAvailable: true, reservedHostingAvailable: false });
+  expect(await (await call(owners[1], "/managed")).json()).toMatchObject({ hostingAvailable: false });
+  expect((await call(owners[1], "/managed", { placement: "standard" })).status).toBe(503);
+  expect((await call(owners[0], "/managed", { placement: "dedicated" })).status).toBe(503);
+  expect((await call(owners[0], "/managed/checkout", { plan: "team" })).status).toBe(503);
+  h.sharedPilotOrgs += ", " + owners[1].orgId;
   const results = await Promise.all(
     owners.map((o) => call(o, "/managed", { placement: "standard" })),
   );

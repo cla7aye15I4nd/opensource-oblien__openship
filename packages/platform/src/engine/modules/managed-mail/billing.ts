@@ -225,9 +225,16 @@ export async function mailCheckoutSummary(
   return { pendingPlan: intent.plan, pendingProduct: intent.product ?? "mailboxes" };
 }
 
+function pilotIncludes(list: string | undefined, org: string) {
+  return list?.split(",").some(id => id.trim() === org) === true;
+}
+
+export function sharedMailActivationEnabled(org: string) {
+  return env.OPENSHIP_MAIL_HOSTED_ENROLLMENT_ENABLED || pilotIncludes(env.OPENSHIP_MAIL_SHARED_PILOT_ORGS, org);
+}
+
 export function dedicatedMailEnrollmentEnabled(org: string) {
-  return env.OPENSHIP_MAIL_HOSTED_ENROLLMENT_ENABLED ||
-    !!env.OPENSHIP_MAIL_DEDICATED_PILOT_ORGS?.split(",").some(id => id.trim() === org);
+  return env.OPENSHIP_MAIL_HOSTED_ENROLLMENT_ENABLED || pilotIncludes(env.OPENSHIP_MAIL_DEDICATED_PILOT_ORGS, org);
 }
 
 export function assertHostedMailEnrollment(dedicatedOrg?: string) {
