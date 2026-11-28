@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { buildMailServerRoutes, type MailServerRouteInput } from "@repo/core";
+import { buildMailServerRoutes, publishedMailHostname, type MailServerRouteInput } from "@repo/core";
 
 const baseInput: MailServerRouteInput = {
   userDomain: "acme.com",
@@ -16,6 +16,14 @@ const baseInput: MailServerRouteInput = {
   zeroClientOrigin: "https://zero-client.opsh.io",
   openshipApiOrigin: "https://api.opsh.io",
 };
+
+it("uses the installation's published MX alias and preserves the default for older installs", () => {
+  const domain = "worker.example.com";
+  const mx = { type: "MX", name: domain, value: "Inbox.Example.com." };
+  expect(publishedMailHostname(domain, { mx })).toBe("inbox.example.com");
+  expect(publishedMailHostname(domain, {})).toBe("mail.worker.example.com");
+  expect(publishedMailHostname(domain, { mx: { ...mx, value: "*.example.com" } })).toBe("mail.worker.example.com");
+});
 
 describe("buildMailServerRoutes", () => {
   it("emits exactly the three user-facing HTTP routes (no admin subdomain)", () => {

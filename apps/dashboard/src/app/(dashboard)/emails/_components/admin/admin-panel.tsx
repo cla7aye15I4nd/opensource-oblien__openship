@@ -29,6 +29,7 @@ import { InstanceSending } from "./instance-sending";
 const WELCOME_SEEN_PREFIX = "openship:mail:welcome-seen:";
 
 type MailAdminPanelProps = {
+  mailHost?: string;
   limits?: ManagedMailSummary["limits"];
   sendingConfigured?: boolean;
   onRefresh: () => void;
@@ -62,7 +63,7 @@ const TAB_ICONS: Record<MailTabKey, IconName> = {
 const cloudTabs: MailTabKey[] = ["overview", "mailboxes", "domains", "sending"];
 const sendingTabs: MailTabKey[] = ["sending", "mailboxes"];
 
-export function MailAdminPanel({ status, serverId, onRefresh, onForgotten, managed = false, limits, sendingConfigured, setup }: MailAdminPanelProps) {
+export function MailAdminPanel({ status, serverId, mailHost, onRefresh, onForgotten, managed = false, limits, sendingConfigured, setup }: MailAdminPanelProps) {
   const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -148,7 +149,7 @@ export function MailAdminPanel({ status, serverId, onRefresh, onForgotten, manag
 
       <div>
         {tab === "overview" && !sendingOnly && (
-          <OverviewTab managed={managed} setup={setup} sendingConfigured={sendingConfigured} onSendingActivated={onRefresh} limits={limits} status={status} serverId={serverId} sectionHref={sectionHref} />
+          <OverviewTab managed={managed} setup={setup} sendingConfigured={sendingConfigured} onSendingActivated={onRefresh} limits={limits} status={status} serverId={serverId} mailHost={mailHost} sectionHref={sectionHref} />
         )}
         {tab === "sending" && <div className="space-y-5">
           {!managed && serverId

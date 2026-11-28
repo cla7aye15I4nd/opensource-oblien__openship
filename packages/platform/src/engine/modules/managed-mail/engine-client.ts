@@ -75,15 +75,17 @@ export async function engineRequest<T>(
   path: string,
   method = "GET",
   body?: unknown,
+  timeout?: number,
 ): Promise<T> {
-  const response = await engineResponse(engine, path, method, body);
+  const response = await engineResponse(engine, path, method, body, timeout);
   return response.json() as Promise<T>;
 }
 
-export function workerStatus(engine: MailEngine) {
+export function workerStatus(engine: MailEngine, timeout?: number) {
   return engineRequest<Static<typeof MailSetupStatusSchema>>(
     engine,
     "/status?serverId=" + encodeURIComponent(engine.serverId),
+    "GET", undefined, timeout,
   );
 }
 

@@ -30,7 +30,7 @@ import {
   checkMailPortReachability,
   mailReachabilityFailureMessage,
 } from "./mail-port-reachability.service";
-import { safeErrorMessage, mailHostname } from "@repo/core";
+import { safeErrorMessage, mailHostname, publishedMailHostname } from "@repo/core";
 import {
   installDocker,
   installContainerEdge,
@@ -734,8 +734,9 @@ export async function stepDkimKeys(
   exec: CommandExecutor,
   domain: string,
   log: StepLogger,
+  previousRecords?: Record<string, unknown> | null,
 ): Promise<StepResult> {
-  const mailDomain = mailHostname(domain);
+  const mailDomain = publishedMailHostname(domain, previousRecords);
   log(6, "info", "Locating amavis binary...");
 
   let amavis: Awaited<ReturnType<typeof resolveAmavis>>;

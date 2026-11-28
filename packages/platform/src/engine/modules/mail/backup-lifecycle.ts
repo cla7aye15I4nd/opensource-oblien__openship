@@ -1,3 +1,4 @@
+import { publishedMailHostname } from "@repo/core";
 import { BareRuntime, type CommandExecutor, type RuntimeAdapter } from "@repo/adapters";
 import { repos } from "@repo/db";
 import { decrypt } from "../../lib/encryption";
@@ -169,12 +170,12 @@ export async function prepareMailRestore(
         if (domain !== state.domain)
           additionalDomains[domain] = {
             ...state.additionalDomains?.[domain],
-            records: buildDomainDnsRecords(state.domain, domain, dkim),
+            records: buildDomainDnsRecords(publishedMailHostname(target.domain, target.dnsRecords), domain, dkim),
             acknowledgedAt: null,
             createdAt: state.additionalDomains?.[domain]?.createdAt ?? new Date().toISOString(),
           };
       }
-      const dns = await stepDkimKeys(exec, state.domain, () => {});
+      const dns = await stepDkimKeys(exec, state.domain, () => {}, target.dnsRecords);
       if (!dns.success || !dns.data?.dnsRecords) throw new Error(dns.message);
       state = {
         ...recordStep(state, dns),

@@ -1,12 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { bindReadyMailEngine, engineResponse, sharedMailTarget } from "./engine-client";
+import { bindReadyMailEngine, engineResponse, sharedMailTarget, workerStatus } from "./engine-client";
 import { pooledSendingAllowance } from "./sending";
 import { customerWebmailStatus } from "./customer-webmail";
 import { enrolledMailEngine } from "./dedicated-fleet";
 import { dedicatedCoverage } from "./dedicated";
 import { z } from "zod";
 import { MAIL_PLACEMENTS } from "@repo/core/managed-mail";
-import { AppError, PRICING } from "@repo/core";
+import { AppError, PRICING, mailHostname, publishedMailHostname } from "@repo/core";
 import { diagnostics } from "@repo/core/diagnostics";
 import { repos } from "@repo/db";
 import {
@@ -213,6 +213,12 @@ async function summary(
     };
   }
   const target = await boundEngine(org, row);
+  // Shared workers keep their installation identity when the public MX is renamed.
+  const hostname = target.shared ? await workerStatus(target, 3000).then(status =>
+    status.serverId === target.serverId && status.domain && mailHostname(status.domain) === target.hostname
+      ? publishedMailHostname(status.domain, status.dnsRecords)
+      : target.hostname,
+  ).catch(() => target.hostname) : target.hostname;
   return {
     id: row.id,
     ...project,
@@ -221,7 +227,7 @@ async function summary(
     ...(row.placement === "dedicated" && target.mailboxStorageMB !== undefined
       ? { mailboxStorageMB: target.mailboxStorageMB }
       : {}),
-    hostname: target.hostname,
+    hostname,
     ...(row.order?.worker?.customerDns && { customerDns: row.order.worker.customerDns }),
     // The already-provisioned fleet address also works when the worker's control API is offline.
     webmailUrl: row.order?.webmailProjectId
@@ -250,7 +256,7 @@ export async function mailServiceSummary(
   const services = bindings.map((item) => ({
     id: item.id,
     placement: item.placement,
-    hostname: item.hostname ?? undefined,
+    hostname: item.shared ? undefined : item.hostname ?? undefined,
     plan: item.order?.plan,
     storageGB: item.order?.storageGB,
     pendingCheckout: item.orderState === "checkout",
