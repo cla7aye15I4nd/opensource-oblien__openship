@@ -70,6 +70,36 @@ it("opens a granted plan with its actual allowances and takes the owner to their
   expect(h.post).not.toHaveBeenCalled();
 });
 
+it("shows shared mailbox hosting and the sending allowance without presenting the platform host as a plan", async () => {
+  h.get.mockResolvedValue({
+    ...business,
+    dedicated: true,
+    service: { id: "tenant-mail", placement: "standard", hostname: "mail.shared.example.test" },
+  });
+  await render();
+  expect(host.textContent).toContain("Shared mailboxes");
+  expect(host.textContent).toContain("Monthly recipients");
+  expect(host.textContent).not.toContain("mail.shared.example.test");
+  expect(host.textContent).not.toContain("Dedicated mail server");
+});
+
+it("uses the dedicated service’s webmail route independently of its mail hostname", async () => {
+  h.get.mockResolvedValue({
+    ...business,
+    product: "dedicated",
+    service: {
+      id: "private",
+      placement: "dedicated",
+      hostname: "mx.example.test",
+      webmailUrl: "https://inbox.example.test",
+    },
+  });
+  await render(undefined, "private");
+  expect(h.get).toHaveBeenCalledExactlyOnceWith("mail/managed/services/private");
+  expect(host.querySelector('a[href="https://inbox.example.test"]')?.textContent).toBe("inbox.example.test");
+  expect(host.textContent).not.toContain("mx.example.test");
+});
+
 it.each([
   [undefined, "account", "mail/managed", "mail/managed/portal"],
   [

@@ -14,7 +14,7 @@ import { PricingCard, PricingCardGrid } from "./PricingCard";
 import { useSidebarCollapseRequest } from "@/context/SidebarLayoutContext";
 import { FeatureIllustration } from "@repo/ui/illustrations";
 import { mailDashboardHref } from "@/lib/billing-links";
-import { mailPlanFacts, mailPlanLabel } from "./plan-presentation";
+import { mailAccountProduct, mailPlanFacts, mailPlanLabel } from "./plan-presentation";
 import { useOptionalCloudPurchase } from "./CloudPurchaseContext";
 import { useCloudPlans } from "./useCloudBilling";
 import {
@@ -121,7 +121,7 @@ function EmailPlanCatalog({
     requestedProduct ??
     (requestedPlan ? "mailboxes" : (data?.pendingProduct ?? data?.product ?? "mailboxes"));
   const sending = mode === "sending";
-  const activeProduct = data?.product ?? (data?.mailboxPlan === null ? "sending" : "mailboxes");
+  const activeProduct = mailAccountProduct(data);
   const subscriptionProduct = data?.subscriptionPlan?.product ?? activeProduct;
   const addingMailboxes = mode === "mailboxes" && subscriptionProduct === "sending" && !data?.mailboxPlan;
   const target =

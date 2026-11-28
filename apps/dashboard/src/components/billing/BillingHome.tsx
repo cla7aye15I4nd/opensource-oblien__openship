@@ -9,7 +9,7 @@ import { emailPlansHref } from "@repo/core/managed-mail";
 import type { ManagedMailSummary } from "@repo/contracts/managed-mail";
 import { managedMailApi } from "@/lib/api/managed-mail";
 import { useScopedResource } from "@/hooks/use-scoped-resource";
-import { mailPlanLabel } from "./plan-presentation";
+import { mailAccountProduct, mailPlanLabel, mailServiceLabel } from "./plan-presentation";
 import type { BillingPendingCheckout, ManagementState, ServerDetail } from "@repo/contracts";
 import { useI18n, interpolate } from "@/components/i18n-provider";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -275,9 +275,11 @@ export function BillingPlanCards({
           footer={pendingMailPurchase ? t.emails.cloudClient.resumeCheckout : t.billing.hub.viewPlan}
         >
           <p className="text-sm leading-6 text-muted-foreground">
-            {(pendingMailPurchase ? mail.pendingProduct : mail.product) === "sending" || (mail.mailboxPlan === null && mail.plan)
-              ? t.emails.cloudClient.apiTitle
-              : t.emails.cloudClient.mailboxesLabel}
+            {mailServiceLabel(
+              pendingMailPurchase ? mail.pendingProduct : mailAccountProduct(mail),
+              pendingMailPurchase ? undefined : mail.service?.placement,
+              t.emails.cloudClient,
+            )}
           </p>
           {mail.limits && (
             <p className="text-sm">
