@@ -10,6 +10,7 @@ import { q } from "@repo/platform/engine/modules/mail/admin/psql-runner";
 import { createAlias, deleteAlias, getAlias, listAliases, updateAliasActive } from "../../../src/modules/mail/admin/aliases.service";
 import { Hono } from "hono";
 import { afterAll, expect, it, vi } from "vitest";
+import { seedScopedToken } from "../audit/_harness";
 import { seedOwner, seedServer } from "../jobs/_harness";
 import { mailAccountRoutes } from "../../../src/modules/mail/accounts.routes";
 import { handleApiError } from "../../../src/middleware/error-handler";
@@ -73,6 +74,7 @@ it("round-trips mail database text under both PostgreSQL string settings", async
 it("scopes lists, stats, address operations and ID-only alias mutations inside one worker database", async () => {
   const owner = await seedOwner({ instanceAdmin: true });
   const server = await seedServer(owner.orgId);
+  const operator = await seedScopedToken(owner, [{ resourceType: "mail_server", resourceId: server, permissions: ["read", "write", "admin"] }]);
   const a = "openship-mail-" + "a".repeat(32),
     b = "openship-mail-" + "b".repeat(32);
   await vmail.exec(await readFile(new URL("../../../../email/engine/samples/iredmail/iredmail.pgsql", import.meta.url), "utf8"));
@@ -95,7 +97,7 @@ it("scopes lists, stats, address operations and ID-only alias mutations inside o
   const app = new Hono().onError(handleApiError).route("/api/mail", mailAccountRoutes);
   const services = { [a]: "managed-mail-first", [b]: "managed-mail-second" };
   const issue = (namespace: string, serviceId: string) => app.request(`/api/mail/admin/${server}/tenant-access`, {
-    method: "POST", headers: { ...owner.auth, "content-type": "application/json" },
+    method: "POST", headers: { ...operator.auth, "content-type": "application/json" },
     body: JSON.stringify({ namespace, serviceId, imapHost: "mail.host.test" }),
   });
   const tokens: Record<string, string> = {};
@@ -114,7 +116,7 @@ it("scopes lists, stats, address operations and ID-only alias mutations inside o
     });
   expect((await call(b, "domains", "GET", undefined, tokens[a])).status).toBe(401);
   expect((await call(a, "domains", "GET", undefined, tokens[a], services[b])).status).toBe(401);
-  expect((await call(a, "domains", "GET", undefined, owner.token)).status).toBe(401);
+  expect((await call(a, "domains", "GET", undefined, operator.token)).status).toBe(401);
   expect((await app.request(`/api/mail/admin/${server}/domains`, { headers: { authorization: "Bearer " + tokens[a] } })).status).toBe(401);
   expect((await call(a, "domains", "POST", { domain: "unclaimed.test" })).status).toBe(409);
   expect((await call(a, "domains/first.test/dns/plan")).status).toBe(404);
@@ -246,7 +248,7 @@ it("scopes lists, stats, address operations and ID-only alias mutations inside o
   const workerFailure = await call(b, "mailboxes/postmaster%40new.test", "PATCH", replacement);
   expect(workerFailure.status).toBe(500);
   expect(await workerFailure.json()).toEqual({ error: "The mail server could not complete this operation." });
-  const parent = await repos.personalAccessToken.findActiveByHash(hashPatToken(owner.token));
+  const parent = await repos.personalAccessToken.findActiveByHash(hashPatToken(operator.token));
   await repos.personalAccessToken.revoke(parent!.id, owner.userId);
   expect((await call(a, "domains")).status).toBe(401);
 });
