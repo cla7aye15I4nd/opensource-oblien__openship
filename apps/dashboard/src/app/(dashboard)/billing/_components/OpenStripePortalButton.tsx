@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button";
 export function OpenStripePortalButton({
   label,
   enabled = false,
+  openPortalUrl,
 }: {
   label?: string;
   enabled?: boolean;
+  openPortalUrl?: () => Promise<{ url: string }>;
 }) {
   const { t } = useI18n();
   const workspaceId = useBillingWorkspace();
@@ -35,11 +37,9 @@ export function OpenStripePortalButton({
     setPending(true);
     setError(null);
     try {
-      const body = await api.post<{ data?: { portalUrl?: string }; portalUrl?: string }>(
-        "billing/portal",
-        { workspaceId },
-      );
-      const portalUrl = body.data?.portalUrl ?? body.portalUrl;
+      const portalUrl = openPortalUrl ? (await openPortalUrl()).url : await api
+        .post<{ data?: { portalUrl?: string }; portalUrl?: string }>("billing/portal", { workspaceId })
+        .then(body => body.data?.portalUrl ?? body.portalUrl);
       if (!portalUrl) throw new Error(t.billing.portal.errorMissingUrl);
       window.location.href = portalUrl;
     } catch (err) {

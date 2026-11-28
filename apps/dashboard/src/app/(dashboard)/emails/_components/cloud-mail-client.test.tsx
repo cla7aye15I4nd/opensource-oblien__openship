@@ -17,7 +17,6 @@ const h = vi.hoisted(() => ({
   query: "",
   catalog: vi.fn(),
   summary: vi.fn(),
-  service: vi.fn(),
   order: vi.fn(),
   registry: vi.fn(),
   status: vi.fn(),
@@ -83,7 +82,6 @@ vi.mock("@/lib/api/managed-mail", () => ({
     testEmail: h.testEmail, message: h.message, issueKey: h.issueKey, revoke: h.revokeKey,
     identityUsage: h.identityUsage, setCap: h.setCap,
     summary: h.summary,
-    service: h.service,
     order: h.order,
     activate: h.activate,
     checkout: h.checkout,
@@ -462,7 +460,7 @@ it("resumes the selected checkout and recovers from a failed provisioning refres
   vi.useFakeTimers();
   try {
     const service = { id: "dedicated-order", placement: "dedicated" };
-    h.service.mockResolvedValueOnce({ plan: null, service: { ...service, provisioning: "payment" } })
+    h.summary.mockResolvedValueOnce({ plan: null, service: { ...service, provisioning: "payment" } })
       .mockRejectedValueOnce(new Error("Temporary network failure"))
       .mockRejectedValueOnce(new Error("Still offline"))
       .mockResolvedValue({ plan: null, service: { ...service, provisioning: "vm" } });

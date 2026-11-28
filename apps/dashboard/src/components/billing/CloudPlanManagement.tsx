@@ -8,7 +8,7 @@ import type { CloudWorkspaceSummary } from "@repo/contracts";
 import { Icon } from "@repo/ui/icons";
 import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
-import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { PlanDetailColumns, PlanDetailTabs } from "./PlanDetailLayout";
 import { PlanChangeModal } from "./PlanChangeModal";
 import { CapacitySummary } from "@/components/shared/CapacitySummary";
 import { useScopedResource } from "@/hooks/use-scoped-resource";
@@ -110,29 +110,20 @@ function PlanContent({
       router.replace(cloudSpaceHref(serverId, tab, params), { scroll: false });
     }
   };
-  const tabs: TabDef<CloudPlanTab>[] = [
-    { key: "overview", label: t.billing.tabs.overview, icon: "dashboard" },
-    { key: "usage", label: t.billing.tabs.usage, icon: "chart-bar" },
-    {
-      key: "payment",
-      label: t.billing.tabs.payment,
-      icon: "credit-card",
-      count: pending.count || undefined,
-    },
-    { key: "activity", label: t.servers.detail.tabs.activity, icon: "clock" },
-    { key: "topups", label: t.billing.tabs.topups, icon: "coins", hidden: !topups },
-  ];
   const returned = query.get("checkout") === "success" || query.get("topup") === "success";
   return (
     <div className="space-y-5">
       {header(
         state?.plan?.name ?? (server.planTierId === "free" ? pendingPurchase?.name : undefined),
       )}
-      <Tabs
-        tabs={tabs.map((item) => ({ ...item, href: href(item.key) }))}
+      <PlanDetailTabs
         value={tab}
-        onChange={(value) => router.replace(href(value), { scroll: false })}
-        ariaLabel={t.billing.layout.title}
+        href={href}
+        pending={pending.count}
+        extra={[
+          { key: "activity", label: t.servers.detail.tabs.activity, icon: "clock" },
+          { key: "topups", label: t.billing.tabs.topups, icon: "coins", hidden: !topups },
+        ]}
       />
       {returned && (
         <BillingCheckoutStatus
@@ -178,86 +169,87 @@ function PlanContent({
           </Button>
         </section>
       )}
-      <div className="grid items-start gap-5 @min-[64rem]/resources:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 space-y-5">
-          {(tab === "overview" || tab === "usage" || tab === "activity") && children}
-          {state ? (
-            <>
-              {tab === "overview" && (
-                <BillingOverview state={state} embedded server={server} onUpdated={refresh} />
-              )}
-              {tab === "usage" && <BillingUsage state={state} />}
-              {tab === "topups" && <BillingTopups state={state} />}
-            </>
-          ) : tab !== "overview" && tab !== "activity" && billing.loading ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              {t.billing.workspaces.loading}
-            </p>
-          ) : null}
-          {tab === "payment" && (
-            <BillingPaymentsPanel
-              workspaceId={workspaceId}
-              portalAvailable={state?.capabilities?.portal === true}
-              hasHistory={Boolean(state && !isNewCloudCustomer(state))}
-            >
-              {state?.subscription && (
-                <BillingSubscriptionControls
-                  state={state}
-                  allowCancellation={false}
-                  onUpdated={refresh}
-                />
-              )}
-            </BillingPaymentsPanel>
-          )}
-        </div>
-        <aside className="min-w-0 space-y-4">
-          {state ? (
-            <>
-              {pendingPurchase && isNewCloudCustomer(state) ? (
-                <section className="space-y-3 rounded-2xl bg-card p-5">
-                  <p className="text-xs text-danger">{t.billing.hub.paymentPending}</p>
-                  <h2 className="text-lg font-medium">{pendingPurchase.name}</h2>
-                  <p className="text-xl font-medium">
-                    {new Intl.NumberFormat(locale, {
-                      style: "currency",
-                      currency: pendingPurchase.currency,
-                    }).format(pendingPurchase.amountCents / 100)}
+      <PlanDetailColumns
+        summary={
+          <>
+            {state ? (
+              <>
+                {pendingPurchase && isNewCloudCustomer(state) ? (
+                  <section className="space-y-3 rounded-2xl bg-card p-5">
+                    <p className="text-xs text-danger">{t.billing.hub.paymentPending}</p>
+                    <h2 className="text-lg font-medium">{pendingPurchase.name}</h2>
+                    <p className="text-xl font-medium">
+                      {new Intl.NumberFormat(locale, {
+                        style: "currency",
+                        currency: pendingPurchase.currency,
+                      }).format(pendingPurchase.amountCents / 100)}
+                    </p>
+                  </section>
+                ) : (
+                  <BillingPlanSummary state={state} allocatedResources={resources} />
+                )}
+                {pending.count === 0 && (
+                  <Button className="w-full" onClick={() => setChanging(true)}>
+                    {t.billing.workspaces.changePlan}
+                    <Icon name="arrow-up-right" className="size-4" aria-hidden="true" />
+                  </Button>
+                )}
+                {changing && (
+                  <PlanChangeDialog
+                    state={state}
+                    allocatedDiskGb={resources ? resources.diskMb / 1024 : undefined}
+                    onClose={closeChange}
+                    onAccepted={() => {
+                      closeChange();
+                      refresh();
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              <section className="space-y-4 rounded-2xl bg-card p-5" aria-busy={billing.loading}>
+                <h2 className="text-base font-medium">{t.servers.resources.capacity}</h2>
+                {resources && <CapacitySummary resources={resources} />}
+                {billing.loading && (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {t.billing.workspaces.loading}
                   </p>
-                </section>
-              ) : (
-                <BillingPlanSummary state={state} allocatedResources={resources} />
-              )}
-              {pending.count === 0 && (
-                <Button className="w-full" onClick={() => setChanging(true)}>
-                  {t.billing.workspaces.changePlan}
-                  <Icon name="arrow-up-right" className="size-4" aria-hidden="true" />
-                </Button>
-              )}
-              {changing && (
-                <PlanChangeDialog
-                  state={state}
-                  allocatedDiskGb={resources ? resources.diskMb / 1024 : undefined}
-                  onClose={closeChange}
-                  onAccepted={() => {
-                    closeChange();
-                    refresh();
-                  }}
-                />
-              )}
-            </>
-          ) : (
-            <section className="space-y-4 rounded-2xl bg-card p-5" aria-busy={billing.loading}>
-              <h2 className="text-base font-medium">{t.servers.resources.capacity}</h2>
-              {resources && <CapacitySummary resources={resources} />}
-              {billing.loading && (
-                <p role="status" className="text-sm text-muted-foreground">
-                  {t.billing.workspaces.loading}
-                </p>
-              )}
-            </section>
-          )}
-        </aside>
-      </div>
+                )}
+              </section>
+            )}
+          </>
+        }
+      >
+        {(tab === "overview" || tab === "usage" || tab === "activity") && children}
+        {state ? (
+          <>
+            {tab === "overview" && (
+              <BillingOverview state={state} embedded server={server} onUpdated={refresh} />
+            )}
+            {tab === "usage" && <BillingUsage state={state} />}
+            {tab === "topups" && <BillingTopups state={state} />}
+          </>
+        ) : tab !== "overview" && tab !== "activity" && billing.loading ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t.billing.workspaces.loading}
+          </p>
+        ) : null}
+        {tab === "payment" && (
+          <BillingPaymentsPanel
+            workspaceId={workspaceId}
+            portalAvailable={state?.capabilities?.portal === true}
+            hasHistory={Boolean(state && !isNewCloudCustomer(state))}
+          >
+            {state?.subscription && (
+              <BillingSubscriptionControls
+                state={state}
+                allowCancellation={false}
+                onUpdated={refresh}
+              />
+            )}
+          </BillingPaymentsPanel>
+        )}
+      </PlanDetailColumns>
     </div>
   );
 }

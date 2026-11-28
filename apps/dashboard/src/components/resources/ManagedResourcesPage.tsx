@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { cloudSpacePlanLabel } from "@/lib/cloud-spaces";
 import { CloudPlanManagement } from "@/components/billing/CloudPlanManagement";
 import { ManagedServerStatus } from "@/components/servers/managed/ManagedServerStatus";
-import { BillingSupportLink } from "@/components/billing/BillingSupportLink";
+import { PlanDetailHeader } from "@/components/billing/PlanDetailLayout";
 import { ServerUsage } from "@/components/servers/ServerUsage";
 import { ManagedServerActivity } from "@/components/servers/managed/ManagedServerActivity";
 import { ManagedServerConnectionNotice } from "@/components/servers/managed/ManagedServerConnectionNotice";
@@ -161,17 +161,10 @@ export function ManagedResourceDetail({
   };
   const header = (planName?: string) => (
     <>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-medium text-foreground">
-            {planName ??
-              (managed.planTierId === "free"
-                ? copy.space
-                : cloudSpacePlanLabel(managed.planTierId, locale, copy.customPlan))}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{copy.description}</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PlanDetailHeader
+        title={planName ?? (managed.planTierId === "free" ? copy.space : cloudSpacePlanLabel(managed.planTierId, locale, copy.customPlan))}
+        description={copy.description}
+        actions={<>
           <Button
             variant="ghost"
             size="icon"
@@ -185,9 +178,8 @@ export function ManagedResourceDetail({
             />
           </Button>
           {managed.planTierId !== "free" && <ManagedServerStatus workspace={managed} />}
-          <BillingSupportLink />
-        </div>
-      </div>
+        </>}
+      />
       {error && (
         <p role="alert" className="mb-4 rounded-xl bg-card p-4 text-sm text-danger">
           {error}

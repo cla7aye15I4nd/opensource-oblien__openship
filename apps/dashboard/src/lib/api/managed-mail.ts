@@ -40,9 +40,8 @@ export const managedMailApi = {
       "mail/sending/domains",
     ),
   release: (id: string) => api.delete("mail/sending/domains/" + encodeURIComponent(id)),
-  summary: () => api.get<ManagedMailSummary>("mail/managed"),
-  service: (id: string) =>
-    api.get<ManagedMailSummary>("mail/managed/services/" + encodeURIComponent(id)),
+  summary: (serviceId?: string | null) =>
+    api.get<ManagedMailSummary>(serviceId ? "mail/managed/services/" + encodeURIComponent(serviceId) : "mail/managed"),
   order: (id: string, action: "resume" | "portal") =>
     api.post<{ url: string }>("mail/managed/services/" + encodeURIComponent(id) + "/" + action),
   cancelOrder: (id: string) =>

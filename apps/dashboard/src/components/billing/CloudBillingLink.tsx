@@ -11,9 +11,8 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { BillingHeader } from "@/app/(dashboard)/billing/_components/BillingHeader";
 import BillingTabSkeleton from "@/app/(dashboard)/billing/_components/BillingTabSkeleton";
 import { changeMailPlanHref, emailPlansHref, parseMailProduct } from "@repo/core/managed-mail";
-import { newServerBillingHref, scopedBillingHref } from "@/lib/billing-links";
 import type { BillingTab } from "@/app/(dashboard)/billing/_components/billing-tabs";
-import { cloudSpaceHref, type CloudPlanTab } from "@/lib/cloud-spaces";
+import { newServerBillingHref, scopedBillingHref, planResourceHref, type PlanResource, type PlanDetailTab } from "@/lib/billing-links";
 
 const organizations = (
   authClient as unknown as {
@@ -34,7 +33,7 @@ export function CloudBillingLink({
   newServer = false,
   purchase,
   returnQuery,
-  serverId,
+  resource,
   planTab,
 }: {
   organizationId: string;
@@ -44,8 +43,8 @@ export function CloudBillingLink({
   newServer?: boolean;
   purchase?: Parameters<typeof newServerBillingHref>[1];
   returnQuery?: Record<string, string | string[] | undefined>;
-  serverId?: string;
-  planTab?: CloudPlanTab;
+  resource?: PlanResource;
+  planTab?: PlanDetailTab;
 }) {
   const { t } = useI18n();
   const [failed, setFailed] = useState(false);
@@ -55,7 +54,7 @@ export function CloudBillingLink({
       !organizationId ||
       organizationId.length > 255 ||
       (workspaceId?.length ?? 0) > 255 ||
-      (serverId?.length ?? 0) > 255
+      ((resource && ("pool" in resource ? resource.pool : resource.serviceId))?.length ?? 0) > 255
     ) {
       setFailed(true);
       return;
@@ -87,10 +86,10 @@ export function CloudBillingLink({
         const path = tab === "home" ? "/billing" : `/billing/${tab}`;
         if (tab === "manage" && (returnQuery?.tab === "overview" || returnQuery?.tab === "payment"))
           query.set("tab", returnQuery.tab);
-        if (serverId) {
+        if (resource) {
           query.set("organizationId", organizationId);
           if (returnQuery?.changePlan === "1") query.set("changePlan", "1");
-          window.location.assign(cloudSpaceHref(serverId, planTab, query));
+          window.location.assign(planResourceHref(resource, planTab, query));
         } else
           window.location.assign(
             newServer && returnQuery?.product === "email"
@@ -107,7 +106,7 @@ export function CloudBillingLink({
     return () => {
       disposed = true;
     };
-  }, [organizationId, tab, workspaceId, newServer, purchase, returnQuery, serverId, planTab]);
+  }, [organizationId, tab, workspaceId, newServer, purchase, returnQuery, resource, planTab]);
   const content = failed ? (
     <div role="alert" className="space-y-4 rounded-2xl bg-card p-5">
       <p className="text-sm text-muted-foreground">{t.billing.creditAlert.wrongOrganization}</p>

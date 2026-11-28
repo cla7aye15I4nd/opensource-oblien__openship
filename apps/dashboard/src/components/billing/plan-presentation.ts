@@ -1,3 +1,4 @@
+import type { Dictionary } from "@/i18n";
 import type { ManagedMailSummary } from "@repo/contracts/managed-mail";
 import type { ApiPlan } from "./PricingCards";
 
@@ -53,4 +54,18 @@ export function mailPlanLabel(name: ManagedMailSummary["plan"] | undefined, incl
     : name
       ? name[0]!.toUpperCase() + name.slice(1)
       : "OpenShip Mail";
+}
+
+export function mailPlanFacts(
+  limits: { recipients: number; domains: number; mailboxes?: number | null; storageGB?: number },
+  copy: Dictionary["emails"]["cloudClient"],
+  locale: string,
+) {
+  const facts = [
+    [copy.recipientsLabel, limits.recipients.toLocaleString(locale)],
+    [copy.domainsLabel, limits.domains.toLocaleString(locale)],
+  ];
+  if (limits.mailboxes != null) facts.push([copy.mailboxesLabel, limits.mailboxes.toLocaleString(locale)]);
+  if (limits.storageGB != null) facts.push([copy.storageLabel, limits.storageGB.toLocaleString(locale) + " GB"]);
+  return facts;
 }

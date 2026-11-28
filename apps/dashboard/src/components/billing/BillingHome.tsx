@@ -17,8 +17,8 @@ import { Button } from "@/components/ui/button";
 import { CapacitySummary } from "@/components/shared/CapacitySummary";
 import { ManagedServerStatus } from "@/components/servers/managed/ManagedServerStatus";
 import { useServerDestinations } from "@/hooks/useServerDestinations";
-import { cloudSpaceHref, cloudSpacePlanLabel } from "@/lib/cloud-spaces";
-import { newServerBillingHref, scopedBillingHref } from "@/lib/billing-links";
+import { cloudSpacePlanLabel } from "@/lib/cloud-spaces";
+import { planResourceHref, newServerBillingHref, scopedBillingHref } from "@/lib/billing-links";
 import { subscriptionNeedsPayment } from "@/lib/billing-presentation";
 import { BillingHeader } from "@/app/(dashboard)/billing/_components/BillingHeader";
 import { useManagementPlan } from "./useManagementPlan";
@@ -134,6 +134,7 @@ export function BillingPlanCards({
     subscriptionNeedsPayment(subscription?.status),
   );
   const plansHref = newServerBillingHref(organizationId);
+  const pendingMailPurchase = mail?.pendingPlan && !mail.plan && !mail.service;
   const cards = new Map(
     spaces.map((server) => [server.cloudReference?.workspaceId ?? server.managed!.id, server]),
   );
@@ -158,7 +159,7 @@ export function BillingPlanCards({
         return (
           <PlanCard
             key={server.id}
-            href={cloudSpaceHref(server.id, paymentRequired ? "payment" : undefined)}
+            href={planResourceHref({ pool: server.id }, paymentRequired ? "payment" : undefined)}
             illustration="deploy-anywhere"
             kind={t.servers.resources.space}
             title={
@@ -256,23 +257,25 @@ export function BillingPlanCards({
       )}
       {mail && (mail.plan || mail.pendingPlan || mail.hasBillingAccount || mail.service) && (
         <PlanCard
-          href={emailPlansHref(mail.pendingPlan ?? null, organizationId, mail.pendingProduct ?? mail.product)}
+          href={pendingMailPurchase
+            ? emailPlansHref(mail.pendingPlan, organizationId, mail.pendingProduct ?? mail.product)
+            : planResourceHref({ product: "email", organizationId })}
           illustration="mail"
           kind="OpenShip Mail"
           title={mailPlanLabel(mail.plan ?? mail.pendingPlan, t.emails.cloudClient.included)}
           status={
             <span className="text-xs text-muted-foreground">
-              {mail.pendingPlan
+              {pendingMailPurchase
                 ? t.billing.hub.paymentPending
                 : mail.plan
                   ? t.billing.hub.active
                   : t.billing.hub.inactive}
             </span>
           }
-          footer={mail.pendingPlan ? t.emails.cloudClient.resumeCheckout : t.billing.hub.viewPlan}
+          footer={pendingMailPurchase ? t.emails.cloudClient.resumeCheckout : t.billing.hub.viewPlan}
         >
           <p className="text-sm leading-6 text-muted-foreground">
-            {(mail.pendingProduct ?? mail.product) === "sending" || (mail.mailboxPlan === null && mail.plan)
+            {(pendingMailPurchase ? mail.pendingProduct : mail.product) === "sending" || (mail.mailboxPlan === null && mail.plan)
               ? t.emails.cloudClient.apiTitle
               : t.emails.cloudClient.mailboxesLabel}
           </p>
@@ -286,9 +289,9 @@ export function BillingPlanCards({
       )}
       {mail?.services?.filter(item => item.plan).map(item => (
         <PlanCard key={item.id} href={item.pendingCheckout ? emailPlansHref(item.plan, organizationId, "dedicated", item.storageGB) :
-          "/emails?" + new URLSearchParams({ hosting: "cloud", serviceId: item.id, ...(organizationId && { organizationId }) })}
+          planResourceHref({ product: "email", serviceId: item.id, organizationId })}
           illustration="mail" kind={t.emails.cloudClient.dedicatedTitle} title={mailPlanLabel(item.plan, t.emails.cloudClient.included)}
-          footer={item.pendingCheckout ? t.emails.cloudClient.resumeCheckout : t.emails.cloudClient.openDashboard}
+          footer={item.pendingCheckout ? t.emails.cloudClient.resumeCheckout : t.billing.hub.viewPlan}
           status={item.pendingCheckout ? t.billing.hub.paymentPending : undefined}>
           <p className="text-sm">{item.storageGB} GB · {t.emails.cloudClient.relayIncluded}</p>
         </PlanCard>

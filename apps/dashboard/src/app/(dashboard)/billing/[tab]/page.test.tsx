@@ -32,6 +32,7 @@ import { I18nProvider } from "@/components/i18n-provider";
 import { BillingUnavailable } from "../_components/BillingUnavailable";
 import { CloudBillingLink } from "@/components/billing/CloudBillingLink";
 import BillingPage from "../page";
+import { MailPlanDetails } from "@/components/billing/MailPlanDetails";
 import { EmailPlans } from "@/components/billing/EmailPlans";
 import { BillingHome } from "@/components/billing/BillingHome";
 import { ManagedServerPurchase } from "@/components/servers/managed/ManagedServerPurchase";
@@ -263,7 +264,7 @@ it("authorizes direct plan links before mounting the plan", async () => {
   };
   const page = await ResourcesPage({ searchParams: Promise.resolve(query) });
   expect(findElement<Record<string, unknown>>(page, CloudBillingLink)?.props).toMatchObject({
-    serverId: "server-b",
+    resource: { pool: "server-b" },
     planTab: "payment",
     returnQuery: query,
   });
@@ -309,4 +310,28 @@ it("resolves a selected email tier into billing without mounting compute acquisi
     "team",
   );
   expect(findElement(page, ManagedServerPurchase)).toBeUndefined();
+});
+
+it("preserves the selected mail service and tab across the same organization handoff as a VM", async () => {
+  const query = { product: "email", serviceId: "mail-b", tab: "usage", organizationId: "org-b" };
+  const page = await ResourcesPage({ searchParams: Promise.resolve(query) });
+  expect(findElement<Record<string, unknown>>(page, CloudBillingLink)?.props).toMatchObject({
+    resource: { product: "email", serviceId: "mail-b" }, planTab: "usage", organizationId: "org-b",
+  });
+});
+
+it.each([
+  { product: "email", pool: "server-b" },
+  { product: "email", serviceId: ["one", "two"] },
+])("rejects ambiguous resource selections", async query => {
+  await expect(ResourcesPage({ searchParams: Promise.resolve(query) })).rejects.toMatchObject({
+    digest: expect.stringContaining("/billing;"),
+  });
+});
+
+it.each([undefined, "engine-a"])("opens the owned mail plan directly from Resources (%s)", async serviceId => {
+  const query = { product: "email", organizationId: "org-a", serviceId };
+  const page = await ResourcesPage({ searchParams: Promise.resolve(query) });
+  expect(findElement<{ resource: unknown }>(page, MailPlanDetails)?.props.resource).toEqual(query);
+  expect(findElement(page, EmailPlans)).toBeUndefined();
 });

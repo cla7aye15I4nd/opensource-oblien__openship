@@ -107,9 +107,7 @@ function CloudMailService({
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
       try {
-        const result = selectedService
-          ? await managedMailApi.service(selectedService)
-          : await managedMailApi.summary();
+        const result = await managedMailApi.summary(selectedService);
         if (!current) return;
         provisioningPending.current = !!result.service?.provisioning;
         setData(result);

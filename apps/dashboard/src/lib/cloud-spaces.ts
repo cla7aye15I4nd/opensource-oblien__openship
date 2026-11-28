@@ -1,16 +1,11 @@
 import { PLAN_IDS, resolvePlan, toPricingLocale } from "@repo/core";
 
-export type CloudPlanTab = "overview" | "usage" | "payment" | "activity" | "topups";
+import { planResourceHref, type PlanDetailTab } from "./billing-links";
 
-/** A plan keeps its execution identity, including billing and checkout-return links. */
+export type CloudPlanTab = PlanDetailTab;
+
 export function cloudSpaceHref(serverId: string, tab?: CloudPlanTab, params?: URLSearchParams) {
-  const query = new URLSearchParams(params);
-  query.delete("workspaceId");
-  query.delete("newServer");
-  query.set("pool", serverId);
-  if (tab && tab !== "overview") query.set("tab", tab);
-  else query.delete("tab");
-  return `/resources?${query}`;
+  return planResourceHref({ pool: serverId }, tab, params);
 }
 
 /** Use catalog names without silently calling an unknown offer Free. */

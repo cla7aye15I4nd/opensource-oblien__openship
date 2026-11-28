@@ -13,7 +13,8 @@ import { Icon } from "@repo/ui/icons";
 import { PricingCard, PricingCardGrid } from "./PricingCard";
 import { useSidebarCollapseRequest } from "@/context/SidebarLayoutContext";
 import { FeatureIllustration } from "@repo/ui/illustrations";
-import { mailPlanLabel } from "./plan-presentation";
+import { mailDashboardHref } from "@/lib/billing-links";
+import { mailPlanFacts, mailPlanLabel } from "./plan-presentation";
 import { useOptionalCloudPurchase } from "./CloudPurchaseContext";
 import { useCloudPlans } from "./useCloudBilling";
 import {
@@ -157,11 +158,7 @@ function EmailPlanCatalog({
       {changeTarget && (
         <header className="space-y-3">
           <Link
-            href={
-              changeTarget === "account"
-                ? "/emails?hosting=cloud"
-                : "/emails?hosting=cloud&serviceId=" + encodeURIComponent(changeTarget)
-            }
+            href={mailDashboardHref(changeTarget === "account" ? undefined : changeTarget)}
             className="inline-flex items-center gap-2 text-sm text-muted-foreground"
           >
             <Icon name="arrow-left" className="size-4 rtl:rotate-180" />
@@ -200,7 +197,7 @@ function EmailPlanCatalog({
           <div className="flex flex-wrap gap-2">
             {data.plan && (
               <Button asChild variant="secondary">
-                <Link href="/emails?hosting=cloud">{c.openDashboard}</Link>
+                <Link href={mailDashboardHref()}>{c.openDashboard}</Link>
               </Button>
             )}
             {data.subscriptionTarget === "account" && (
@@ -282,7 +279,7 @@ function EmailPlanCatalog({
                       </Link>
                     </Button>
                     <Button asChild variant="secondary">
-                      <Link href={"/emails?hosting=cloud&serviceId=" + encodeURIComponent(item.id)}>
+                      <Link href={mailDashboardHref(item.id)}>
                         {c.openDashboard}
                       </Link>
                     </Button>
@@ -359,24 +356,11 @@ function EmailPlanCatalog({
               : target === "account" && data?.subscriptionPlan
                 ? data.subscriptionPlan.product === mode && data.subscriptionPlan.plan === tier.id
                 : subscribed && activeProduct === mode && data.plan === tier.id;
-            const facts = [
-              [c.recipientsLabel, tier.recipients.toLocaleString(locale)],
-              [c.domainsLabel, tier.domains.toLocaleString(locale)],
-              ...(sending
-                ? []
-                : [
-                    ...(mode === "dedicated"
-                      ? []
-                      : [[c.mailboxesLabel, tier.mailboxes.toLocaleString(locale)]]),
-                    [
-                      c.storageLabel,
-                      (mode === "dedicated"
-                        ? baseStorage!.storageGB
-                        : tier.storageMB / 1024
-                      ).toLocaleString(locale) + " GB",
-                    ],
-                  ]),
-            ];
+            const facts = mailPlanFacts({
+              recipients: tier.recipients, domains: tier.domains,
+              mailboxes: mode === "mailboxes" ? tier.mailboxes : undefined,
+              storageGB: mode === "dedicated" ? baseStorage!.storageGB : sending ? undefined : tier.storageMB / 1024,
+            }, c, locale);
             return (
               <PricingCard
                 key={tier.id}
