@@ -49,3 +49,36 @@ export function newServerBillingHref(organizationId?: string | null, purchase?: 
 export function workspaceBillingHref(path: string, workspaceId?: string | null) {
   return scopedBillingHref(path, { workspaceId });
 }
+
+export function mailDashboardHref(serviceId?: string, organizationId?: string | null) {
+  const query = new URLSearchParams({ hosting: "cloud" });
+  if (serviceId) query.set("serviceId", serviceId);
+  return scopedBillingHref(`/emails?${query}`, { organizationId });
+}
+
+export type PlanDetailTab = "overview" | "usage" | "payment" | "activity" | "topups";
+
+export type PlanResource = ({ pool: string } | { product: "email"; serviceId?: string }) & {
+  organizationId?: string;
+};
+
+/** Keep the purchased resource selected through tab navigation and billing returns. */
+export function planResourceHref(resource: PlanResource, tab?: PlanDetailTab, params?: URLSearchParams) {
+  const query = new URLSearchParams(params);
+  query.delete("workspaceId");
+  query.delete("newServer");
+  if ("pool" in resource) {
+    query.delete("product");
+    query.delete("serviceId");
+    query.set("pool", resource.pool);
+  } else {
+    query.delete("pool");
+    query.set("product", resource.product);
+    if (resource.serviceId) query.set("serviceId", resource.serviceId);
+    else query.delete("serviceId");
+  }
+  if (resource.organizationId) query.set("organizationId", resource.organizationId);
+  if (tab && tab !== "overview") query.set("tab", tab);
+  else query.delete("tab");
+  return `/resources?${query}`;
+}

@@ -311,13 +311,28 @@ it("matches an existing linked plan through its canonical Cloud reference withou
 it.each([
   ["pending", { pendingPlan: "team" }, baseDictionary.emails.cloudClient.resumeCheckout],
   ["active", { plan: "team" }, baseDictionary.billing.hub.active],
-] as const)("lists a %s email-only plan in the billing inventory", async (_state, plan, action) => {
+] as const)("lists a %s email-only plan in the billing inventory", async (state, plan, action) => {
   h.mail.mockResolvedValue({ service: null, ...plan });
   await render();
-  const card = host.querySelector<HTMLAnchorElement>('a[href^="/billing/plans?product=email"]');
+  const card = host.querySelector<HTMLAnchorElement>(state === "active" ? 'a[href^="/resources?product=email"]' : 'a[href^="/billing/plans?product=email"]');
   expect(new URL(card!.href).searchParams.get("organizationId")).toBe("org-a");
   expect(card?.textContent).toContain("OpenShip Mail");
   expect(card?.textContent).toContain("Team");
   expect(card?.textContent).toContain(action);
   expect(h.replace).not.toHaveBeenCalled();
+});
+
+it("keeps the owned account and each dedicated purchase distinct when checkout is pending", async () => {
+  h.mail.mockResolvedValue({ plan: "business", product: "mailboxes", pendingPlan: "scale", services: [
+    { id: "engine-a", plan: "team", storageGB: 100 },
+    { id: "engine-b", plan: "team", storageGB: 250, pendingCheckout: true },
+  ] });
+  await render();
+  const links = Array.from(host.querySelectorAll("a"));
+  const card = (query: string) => links.find(link => link.getAttribute("href") === query);
+  expect(card("/resources?product=email&organizationId=org-a")?.textContent).toContain("Active");
+  expect(card("/resources?product=email&serviceId=engine-a&organizationId=org-a")?.textContent).toContain("View plan");
+  const pending = links.find(link => new URL(link.href).searchParams.get("storageGB") === "250");
+  expect(pending?.pathname).toBe("/billing/plans");
+  expect(pending?.textContent).toContain(baseDictionary.emails.cloudClient.resumeCheckout);
 });
