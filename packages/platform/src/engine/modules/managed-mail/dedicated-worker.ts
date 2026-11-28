@@ -1,21 +1,28 @@
 import { AppError } from "@repo/core";
 import { z } from "zod";
 
-const config = z
+const worker = z
   .object({
     origin: z.url().refine((value) => {
       const url = new URL(value);
       return url.protocol === "https:" && url.origin === value;
     }),
     token: z.string().min(1),
-    domain: z.hostname(),
     sshPublicKey: z.string().regex(/^ssh-ed25519 [A-Za-z0-9+/=]+(?: [^\r\n]+)?$/),
-    dnsProvider: z.enum(["cloudflare", "digitalocean"]),
-    dnsToken: z.string().min(1),
-    webmailIngressIPv4: z.ipv4().optional(),
-    zoneId: z.string().min(1),
   })
   .strict();
+// Keep the existing flat operator configuration compatible. A worker alone
+// uses customer-managed DNS. A partially configured DNS provider is invalid.
+const operatorFleet = worker.extend({
+  domain: z.hostname(),
+  dnsProvider: z.enum(["cloudflare", "digitalocean"]),
+  dnsToken: z.string().min(1),
+  zoneId: z.string().min(1),
+  webmailIngressIPv4: z.ipv4().optional(),
+}).transform(({ domain, dnsProvider, dnsToken, zoneId, ...settings }) => ({
+  ...settings, dns: { domain, provider: dnsProvider, token: dnsToken, zoneId },
+}));
+const config = z.union([operatorFleet, worker.transform(settings => ({ ...settings, dns: null }))]);
 export type DedicatedMailFleet = z.infer<typeof config>;
 
 export function parseDedicatedMailFleet(value?: string) {

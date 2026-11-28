@@ -72,6 +72,7 @@ export function MailAdminPanel({ status, serverId, onRefresh, onForgotten, manag
   // state and not just on the view.
   const railHasTabs = useMailRailOwnsTabs(serverId ?? null);
   const primaryDomain = managed ? "" : status?.domain ?? "";
+  const inboxDomain = managed && status?.dnsRecords ? status.domain ?? "" : primaryDomain;
   const [showWelcome, setShowWelcome] = useState(false);
 
   // One-shot welcome modal: first time the admin panel mounts for this
@@ -165,7 +166,7 @@ export function MailAdminPanel({ status, serverId, onRefresh, onForgotten, manag
           {tab === "domains" && (
             <DomainsTab managed={managed} sectionHref={sectionHref}
               serverId={serverId}
-              primaryDomain={primaryDomain}
+              primaryDomain={inboxDomain}
               onDomainDeleted={(deleted) => {
                 // If the URL's `?domain=` matched the just-deleted domain,
                 // strip it so subsequent navigation to the Mailboxes tab
@@ -200,7 +201,7 @@ export function MailAdminPanel({ status, serverId, onRefresh, onForgotten, manag
             <DnsTab
               status={status}
               serverId={serverId}
-              primaryDomain={primaryDomain}
+              primaryDomain={inboxDomain}
               selectedDomain={selectedDomain}
               onSelectDomain={selectDomain}
             />

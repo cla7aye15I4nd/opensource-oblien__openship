@@ -174,7 +174,7 @@ export function createManagedMailRepo(db: Database) {
         .limit(1);
       return row;
     },
-    async attachVm(id: string, organizationId: string, engine: string, hostname: string) {
+    async attachVm(id: string, organizationId: string, engine: string, hostname: string, order?: NonNullable<typeof services.$inferSelect.order>) {
       try {
         return await db.transaction(async (tx) => {
           const [host] = await tx
@@ -185,11 +185,12 @@ export function createManagedMailRepo(db: Database) {
           if (!host) return false;
           const [row] = await tx
             .update(services)
-            .set({ engine, hostname })
+            .set({ engine, hostname, ...(order && { order }) })
             .where(
               and(
                 eq(services.id, id),
                 eq(services.organizationId, organizationId),
+                order ? eq(services.orderState, "funded") : undefined,
                 isNull(services.engine),
               ),
             )

@@ -45,7 +45,7 @@ const engineSchema = z
     mailboxStorageMB: z.number().int().positive().optional(),
   })
   .strict();
-export type MailEngine = z.infer<typeof engineSchema> & { customerProjectId?: string };
+export type MailEngine = z.infer<typeof engineSchema> & { customerProjectId?: string; customerDomain?: string };
 function configError() {
   return new AppError(
     "Managed mail capacity is misconfigured. Contact the operator.",
@@ -201,6 +201,7 @@ async function summary(
       ...project,
       placement: row.placement,
       ...(row.cloudServerId ? { cloudServerId: row.cloudServerId } : {}),
+      ...(row.order?.worker?.customerDns && { customerDns: row.order.worker.customerDns }),
       provisioning:
         row.orderState === "checkout"
           ? "payment"
@@ -221,6 +222,7 @@ async function summary(
       ? { mailboxStorageMB: target.mailboxStorageMB }
       : {}),
     hostname: target.hostname,
+    ...(row.order?.worker?.customerDns && { customerDns: row.order.worker.customerDns }),
     // The already-provisioned fleet address also works when the worker's control API is offline.
     webmailUrl: row.order?.webmailProjectId
       ? (customerApp?.installed && customerApp.verifiedUrl) || null

@@ -340,7 +340,10 @@ async function classifyRecord(
   const { target, conflict } = selectDnsRecord(existing, content, desired.append === true);
   if (conflict) return { action: "conflict", current: `${existing.length} existing records` };
   if (!target) return { action: "create" };
-  if (target.content === content) return { action: "in-sync", current: target.content };
+  if (target.content === content && (desired.append || (
+    (desired.proxied === undefined || target.proxied === desired.proxied) &&
+    (desired.priority === undefined || target.priority === desired.priority)
+  ))) return { action: "in-sync", current: target.content };
   return { action: isOpenshipManaged(target) ? "update" : "adopt", current: target.content };
 }
 

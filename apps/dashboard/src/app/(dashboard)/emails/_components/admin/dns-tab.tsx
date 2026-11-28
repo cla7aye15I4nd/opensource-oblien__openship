@@ -27,6 +27,8 @@ import {
   type DnsScanResult,
   type MailSetupStatus,
 } from "@/lib/api";
+import { isManagedMailId } from "@repo/contracts/managed-mail";
+import { InboxDnsProvider } from "../dedicated-inbox-setup";
 import { DnsRecordsView } from "@/components/shared/DnsRecordsView";
 import { AutoDnsPanel } from "@/components/shared/AutoDnsPanel";
 import { SectionCard } from "./_shared/section-card";
@@ -170,15 +172,6 @@ export function DnsTab({
         )}
       </DomainPicker>
 
-      {/* On-demand auto-configure via a connected DNS provider (Settings→DNS). */}
-      {activeDomain ? (
-        <AutoDnsPanel
-          plan={() => mailAdminApi.domains.dnsPlan(serverId, activeDomain).then((r) => r.data)}
-          apply={() => mailAdminApi.domains.dnsApply(serverId, activeDomain).then((r) => r.data)}
-          reloadKey={activeDomain}
-        />
-      ) : null}
-
       {/* Records for publishing */}
       <SectionCard
         title={t.emailsAdmin.dns.recordsTitle}
@@ -205,6 +198,17 @@ export function DnsTab({
           </div>
         )}
       </SectionCard>
+
+      {/* On-demand auto-configure via a connected DNS provider (Settings→DNS). */}
+      {activeDomain && isPrimary && isManagedMailId(serverId) ? (
+        <InboxDnsProvider serviceId={serverId} domain={activeDomain} stage="receiving" />
+      ) : activeDomain ? (
+        <AutoDnsPanel
+          plan={() => mailAdminApi.domains.dnsPlan(serverId, activeDomain).then((r) => r.data)}
+          apply={() => mailAdminApi.domains.dnsApply(serverId, activeDomain).then((r) => r.data)}
+          reloadKey={activeDomain}
+        />
+      ) : null}
 
       {/* Published-records verification */}
       <SectionCard

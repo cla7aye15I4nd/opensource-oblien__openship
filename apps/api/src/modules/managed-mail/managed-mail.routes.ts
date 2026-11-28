@@ -4,6 +4,7 @@ import {
   mailChangeStatus,
   cancelMailChange,
 } from "@repo/platform/engine/modules/managed-mail/plan-change";
+import { configureInboxDomain, dedicatedInboxProviderDns } from "./inbox-domain";
 import { discoverMailbox } from "./discovery";
 import { connectHostedSending } from "@repo/platform/engine/modules/managed-mail/hosted-sending";
 import { Hono, type Context } from "hono";
@@ -14,6 +15,7 @@ import {
   MailCheckoutInput,
   MailPlacementInput,
   SendingDomainInput,
+  InboxDnsInput,
   ManagedTestEmailInput,
   MailSendInput,
   MailRelayKeyInput,
@@ -105,6 +107,22 @@ async function serviceSummary(org: string, c: Context) {
 }
 cloudRoute("get", "/managed", { tag: "mail_server:list" }, serviceSummary);
 cloudRoute("get", "/managed/services/:serverId", { tag: "mail_server:list" }, serviceSummary);
+cloudRoute("put", "/managed/services/:serverId/inbox-domain", {
+  tag: "mail_server:admin", ids: { mail_server: "serverId" }, body: SendingDomainInput, rateLimit: "billing-portal",
+}, async (org, c) =>
+  configureInboxDomain(org, c.req.param("serverId")!, (await c.req.json<Static<typeof SendingDomainInput>>()).domain),
+);
+for (const action of ["plan", "apply"] as const) {
+  cloudRoute("post", "/managed/services/:serverId/inbox-domain/dns/" + action, {
+    tag: "mail_server:admin", ids: { mail_server: "serverId" }, body: InboxDnsInput,
+    readOnly: action === "plan",
+  }, async (org, c) => {
+    await permission.assert(getRequestContext(c), {
+      resourceType: "settings", resourceId: "*", action: action === "apply" ? "admin" : "read",
+    });
+    return dedicatedInboxProviderDns(org, c.req.param("serverId")!, await c.req.json<Static<typeof InboxDnsInput>>(), action === "apply");
+  });
+}
 const changePath = "/managed/plans/:id/change";
 cloudRoute("get", changePath, { tag: "billing:read" }, (org, c) =>
   mailChangeStatus(org, providerId(c)),

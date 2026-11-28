@@ -39,6 +39,9 @@ const h = vi.hoisted(() => ({
   purgeMailbox: vi.fn(),
   sendingDomains: vi.fn(),
   connectDomain: vi.fn(),
+  inboxDnsPlan: vi.fn(),
+  inboxDnsApply: vi.fn(),
+  configureInboxDomain: vi.fn(),
   sender: vi.fn(),
   verifySender: vi.fn(),
   testEmail: vi.fn(),
@@ -81,6 +84,7 @@ vi.mock("@/lib/api/managed-mail", () => ({
     domains: h.sendingDomains, domain: h.connectDomain, sender: h.sender, verify: h.verifySender, keys: h.sendingKeys, usage: h.sendingUsage,
     testEmail: h.testEmail, message: h.message, issueKey: h.issueKey, revoke: h.revokeKey,
     identityUsage: h.identityUsage, setCap: h.setCap,
+    inboxDnsPlan: h.inboxDnsPlan, inboxDnsApply: h.inboxDnsApply, configureInboxDomain: h.configureInboxDomain,
     summary: h.summary,
     order: h.order,
     activate: h.activate,
@@ -454,6 +458,38 @@ it("opens the funded inbox from a dedicated-only deep link while billing is unav
   await renderView("mailView=sending&senderId=sender-one");
   expect(h.replace).toHaveBeenCalledWith("/emails?mailView=sending&senderId=sender-one&serviceId=ready");
   expect(container.textContent).not.toContain("View email plans");
+});
+
+it("shows dedicated inbox DNS before offering the connected provider and defers MX until verified", async () => {
+  const id = "managed-mail-dedicated";
+  const service = { id, placement: "dedicated", provisioning: "install", customerDns: { ipv6: "2001:db8::7" } };
+  h.summary.mockResolvedValue({ product: "dedicated", plan: "business", service });
+  h.inboxDnsPlan.mockResolvedValue({ data: { status: "none", records: [] } });
+  await renderView("serviceId=" + id);
+  const input = container.querySelector<HTMLInputElement>('input[placeholder="example.com"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "example.org");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(container.textContent).toContain("_openship-mail.example.org");
+  expect(container.textContent).toContain("2001:db8::7");
+  expect(container.textContent).not.toContain("MX");
+  expect(h.inboxDnsPlan).not.toHaveBeenCalled();
+  const disclosure = container.querySelector("details")!;
+  await act(async () => {
+    disclosure.open = true;
+    disclosure.dispatchEvent(new Event("toggle"));
+  });
+  expect(h.inboxDnsPlan).toHaveBeenCalledWith(id, { domain: "example.org", stage: "setup" });
+  expect(h.inboxDnsApply).not.toHaveBeenCalled();
+  h.summary.mockResolvedValue({ product: "dedicated", plan: "business", service: {
+    ...service, customerDns: { ...service.customerDns, domain: "example.org" },
+  } });
+  await act(async () => buttonNamed("Verify and set up mail").click());
+  expect(h.configureInboxDomain).toHaveBeenCalledWith(id, "example.org");
+  expect(container.textContent).toContain("MX");
+  expect(container.textContent).toContain("mail.example.org");
+  expect(h.inboxDnsApply).not.toHaveBeenCalled();
 });
 
 it("resumes the selected checkout and recovers from a failed provisioning refresh", async () => {
@@ -1027,6 +1063,18 @@ function mockMailPlans() {
   });
   h.checkout.mockRejectedValue(new Error("Offline checkout"));
 }
+
+it("shows the current tier on the pricing card without duplicating the plan dashboard", async () => {
+  mockMailPlans();
+  h.summary.mockResolvedValue({
+    plan: "team", product: "mailboxes", hasBillingAccount: true,
+    services: [{ id: "managed-mail-123", plan: "team", placement: "dedicated", storageGB: 100 }],
+  });
+  await act(async () => root.render(<I18nProvider><EmailPlans /></I18nProvider>));
+  expect(buttonNamed("Current plan").closest("article")).not.toBeNull();
+  expect(container.textContent).not.toContain("Open mail dashboard");
+  expect(container.querySelector('a[href*="/emails"]')).toBeNull();
+});
 
 it("closes hosted plan purchases while keeping the Email API purchase available", async () => {
   mockMailPlans();
