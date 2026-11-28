@@ -67,7 +67,7 @@ account(
   "get",
   "/admin/:serverId/domains",
   {
-    tag: "mail_server:list",
+    tag: "mail_server:read",
     mcp: { description: "List mail domains configured on this mail server." },
   },
   "listDomainsHandler",
@@ -190,7 +190,7 @@ account(
   "get",
   "/admin/:serverId/mailboxes",
   {
-    tag: "mail_server:list",
+    tag: "mail_server:read",
     mcp: {
       description:
         "List mailboxes, optionally filtered by query.domain. Passwords are not returned.",
@@ -251,7 +251,7 @@ account(
   "get",
   "/admin/:serverId/aliases",
   {
-    tag: "mail_server:list",
+    tag: "mail_server:read",
     mcp: { description: "List mail aliases and forwards, optionally filtered by query.domain." },
     query: MailRequestSchemas.domainFilter,
   },

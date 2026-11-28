@@ -408,13 +408,13 @@ Use `--schema` for JSON configuration commands. Mail is a remote, self-hosted fe
 | Recheck the certificate on disk and served by SMTP/IMAP without issuing a certificate or sending email. | `mail.checkCertificate(id)`<br />Remote client | `POST /api/mail/admin/:serverId/certificate/check`<br />`mail_server:write` · Self-hosted |
 | Renew a due mail certificate through Openship Edge and reload Postfix/Dovecot, reusing a still-valid certificate and repairing its service configuration. | `mail.renewCertificate(id)`<br />Remote client | `POST /api/mail/admin/:serverId/certificate/renew`<br />`mail_server:admin` · Self-hosted |
 | Set `autoRenew` to enable or disable automatic mail certificate renewal. Monitoring continues when renewal is disabled. | `mail.updateCertificate(id, input)`<br />Remote client | `PATCH /api/mail/admin/:serverId/certificate`<br />`mail_server:admin` · Self-hosted |
-| List mail domains on the server. | `mail.listDomains(id)`<br />Remote client | `GET /api/mail/admin/:serverId/domains`<br />`mail_server:list` |
+| List mail domains on the server. | `mail.listDomains(id)`<br />Remote client | `GET /api/mail/admin/:serverId/domains`<br />`mail_server:read` |
 | Add a mail domain. | `mail.createDomain(id, input)`<br />Remote client | `POST /api/mail/admin/:serverId/domains`<br />`mail_server:write` |
 | List additional domains whose DNS is still pending. | `mail.pendingDomainDns(id)`<br />Remote client | `GET /api/mail/admin/:serverId/domains-dns/pending`<br />`mail_server:read` |
-| List mailboxes in a domain. | `mail.listMailboxes(id, input)`<br />Remote client | `GET /api/mail/admin/:serverId/mailboxes`<br />`mail_server:list` |
+| List mailboxes in a domain. | `mail.listMailboxes(id, input)`<br />Remote client | `GET /api/mail/admin/:serverId/mailboxes`<br />`mail_server:read` |
 | Create a mailbox. | `mail.createMailbox(id, input)`<br />Remote client | `POST /api/mail/admin/:serverId/mailboxes`<br />`mail_server:write` |
 | Rotate the platform mailbox credential. | `mail.rotatePlatformMailbox(id)`<br />Remote client | `POST /api/mail/admin/:serverId/platform-mailbox/rotate`<br />`mail_server:admin` · Self-hosted |
-| List mail aliases on a server. | `mail.listAliases(id, input)`<br />Remote client | `GET /api/mail/admin/:serverId/aliases`<br />`mail_server:list` |
+| List mail aliases on a server. | `mail.listAliases(id, input)`<br />Remote client | `GET /api/mail/admin/:serverId/aliases`<br />`mail_server:read` |
 | Create a mail alias. | `mail.createAlias(id, input)`<br />Remote client | `POST /api/mail/admin/:serverId/aliases`<br />`mail_server:write` |
 | Aggregate counts (domains, mailboxes, storage). | `mail.getStats(id)`<br />Remote client | `GET /api/mail/admin/:serverId/stats`<br />`mail_server:read` |
 | The mail server's backup policy (or `null`). | `mail.getBackupPolicy(id)`<br />Remote client | `GET /api/mail/admin/:serverId/backup-policy`<br />`mail_server:read` · Self-hosted |
@@ -514,12 +514,12 @@ Use `--schema` for JSON configuration commands. Mail is a remote, self-hosted fe
 
 | Operation | SDK | REST API |
 | --- | --- | --- |
-| List mail aliases on a server. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/aliases`<br />`mail_server:list` · Self-hosted |
+| List mail aliases on a server. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/aliases`<br />`mail_server:read` · Self-hosted |
 | Create a mail alias. | HTTP only | `POST /api/mail/tenants/:mailTenant/admin/:serverId/aliases`<br />`mail_server:write` · Self-hosted |
 | Remove a mail alias. | HTTP only | `DELETE /api/mail/tenants/:mailTenant/admin/:serverId/aliases/:id`<br />`mail_server:admin` · Self-hosted |
 | Update a mail alias. | HTTP only | `PATCH /api/mail/tenants/:mailTenant/admin/:serverId/aliases/:id`<br />`mail_server:write` · Self-hosted |
 | Live DNS health scan (MX/SPF/DKIM/DMARC/PTR). | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/dns-scan`<br />`mail_server:read` · Self-hosted |
-| List mail domains on the server. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/domains`<br />`mail_server:list` · Self-hosted |
+| List mail domains on the server. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/domains`<br />`mail_server:read` · Self-hosted |
 | Add a mail domain. | HTTP only | `POST /api/mail/tenants/:mailTenant/admin/:serverId/domains`<br />`mail_server:write` · Self-hosted |
 | List additional domains whose DNS is still pending. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/domains-dns/pending`<br />`mail_server:read` · Self-hosted |
 | Delete a domain (add `?cascade=true` to remove its mailboxes too). | HTTP only | `DELETE /api/mail/tenants/:mailTenant/admin/:serverId/domains/:domain`<br />`mail_server:admin` · Self-hosted |
@@ -528,7 +528,7 @@ Use `--schema` for JSON configuration commands. Mail is a remote, self-hosted fe
 | Count mailboxes/aliases that depend on a domain. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/domains/:domain/dependents`<br />`mail_server:read` · Self-hosted |
 | DNS records + publish state for an additional domain. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/domains/:domain/dns`<br />`mail_server:read` · Self-hosted |
 | Confirm a domain's DNS records are published. | HTTP only | `POST /api/mail/tenants/:mailTenant/admin/:serverId/domains/:domain/dns/acknowledge`<br />`mail_server:write` · Self-hosted |
-| List mailboxes in a domain. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/mailboxes`<br />`mail_server:list` · Self-hosted |
+| List mailboxes in a domain. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/mailboxes`<br />`mail_server:read` · Self-hosted |
 | Create a mailbox. | HTTP only | `POST /api/mail/tenants/:mailTenant/admin/:serverId/mailboxes`<br />`mail_server:write` · Self-hosted |
 | Delete a mailbox (add `?hard=true` to purge its maildir; default is a soft delete). | HTTP only | `DELETE /api/mail/tenants/:mailTenant/admin/:serverId/mailboxes/:email`<br />`mail_server:admin` · Self-hosted |
 | Get one mailbox. | HTTP only | `GET /api/mail/tenants/:mailTenant/admin/:serverId/mailboxes/:email`<br />`mail_server:read` · Self-hosted |

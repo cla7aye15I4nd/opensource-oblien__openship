@@ -306,7 +306,7 @@ describe("MCP route input and transport contracts", () => {
     expect(names).not.toContain("post_system_compute_clusters");
   });
 
-  it("matches wildcard gates for catalog reads and mail collections without hiding resource reads", () => {
+  it("exposes server-scoped mail reads and requires wildcard access for fleet and catalog operations", () => {
     const principal = {
       role: "restricted" as const,
       readOnly: false,
@@ -317,7 +317,8 @@ describe("MCP route input and transport contracts", () => {
     const names = filterToolsForPrincipal(getMcpTools(), principal).map((tool) => tool.name);
     expect(names).toContain("get_mail_admin_by_serverId_mailboxes_by_email");
     expect(names).toContain("get_domains");
-    expect(names).not.toContain("get_mail_admin_by_serverId_mailboxes");
+    for (const collection of ["mailboxes", "aliases", "domains"])
+      expect(names).toContain("get_mail_admin_by_serverId_" + collection);
     expect(names).not.toContain("get_mail_status");
     expect(names).not.toContain("get_apps_catalog_by_id");
     expect(names).not.toContain("post_domains_preview");
@@ -325,7 +326,6 @@ describe("MCP route input and transport contracts", () => {
     const withMailReads = filterToolsForPrincipal(getMcpTools(), principal).map(
       (tool) => tool.name,
     );
-    expect(withMailReads).toContain("get_mail_admin_by_serverId_mailboxes");
     expect(withMailReads).toContain("get_mail_status");
     expect(withMailReads).not.toContain("post_mail_scan");
   });
