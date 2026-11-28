@@ -1,6 +1,6 @@
 import { isIPv6 } from "node:net";
 import type { Oblien } from "@repo/adapters";
-import { AppError } from "@repo/core";
+import { AppError, mailHostname } from "@repo/core";
 import { repos } from "@repo/db";
 import { z } from "zod";
 import { env } from "../../config/env";
@@ -57,9 +57,6 @@ export function dedicatedFleet() {
   return parseDedicatedMailFleet(env.OPENSHIP_MAIL_DEDICATED_FLEET);
 }
 
-function serviceDomain(row: Service, fleet: DedicatedMailFleet) {
-  return row.id + "." + fleet.domain;
-}
 export function enrolledMailEngine(row: Service, fleet = dedicatedFleet()): MailEngine | undefined {
   if (
     !fleet ||
@@ -68,13 +65,18 @@ export function enrolledMailEngine(row: Service, fleet = dedicatedFleet()): Mail
     row.order.worker.origin !== fleet.origin
   )
     return;
-  const hostname = "mail." + serviceDomain(row, fleet);
+  const customerDns = row.order.worker.customerDns;
+  const domain = customerDns ? customerDns.domain : row.hostname?.replace(/^mail\./, "") ??
+    (fleet.dns ? row.id + "." + fleet.dns.domain : undefined);
+  if (!domain) return;
+  const hostname = mailHostname(domain);
   return {
     origin: fleet.origin,
     token: fleet.token,
     serverId: row.order.worker.id,
     hostname,
-    webmailUrl: "https://webmail." + serviceDomain(row, fleet),
+    webmailUrl: "https://webmail." + domain,
+    customerDomain: customerDns?.domain,
     placement: "dedicated",
     prepare: true,
     providerVmId: row.cloudServerId,
@@ -85,9 +87,9 @@ export function enrolledMailEngine(row: Service, fleet = dedicatedFleet()): Mail
 /** Operator DNS is confined to this service's technical domain. Customer DNS uses the normal domain flow. */
 export async function publishDedicatedDkim(engine: MailEngine, record: unknown) {
   const fleet = dedicatedFleet();
-  if (!fleet || engine.origin !== fleet.origin || !engine.providerVmId) return;
+  if (!fleet || !fleet.dns || engine.customerDomain || engine.origin !== fleet.origin || !engine.providerVmId) return;
   const domain = engine.hostname.replace(/^mail\./, "");
-  if (!domain.endsWith("." + fleet.domain)) return;
+  if (!domain.endsWith("." + fleet.dns.domain)) return;
   const key = z
     .object({
       type: z.literal("TXT"),
@@ -95,9 +97,9 @@ export async function publishDedicatedDkim(engine: MailEngine, record: unknown) 
       value: z.string().min(1).max(8192),
     })
     .parse(record);
-  await resolveDnsProvider(fleet.dnsProvider).upsertRecord(
-    { apiToken: fleet.dnsToken },
-    fleet.zoneId,
+  await resolveDnsProvider(fleet.dns.provider).upsertRecord(
+    { apiToken: fleet.dns.token },
+    fleet.dns.zoneId,
     { type: "TXT", name: key.name, content: key.value },
   );
 }
@@ -129,19 +131,6 @@ export async function enrollDedicatedVm(row: Service, fleet: DedicatedMailFleet)
   const vm = client.vm(owned.id);
   const address = await dedicatedMailAddress(vm.network);
   if (!address) return;
-  const domain = serviceDomain(row, fleet);
-  const dns = resolveDnsProvider(fleet.dnsProvider);
-  const credentials = { apiToken: fleet.dnsToken };
-  // Browser hostnames are claimed by the customer's catalog App through normal routing.
-  await dns.upsertRecord(credentials, fleet.zoneId, {
-    type: "AAAA", name: "mail." + domain, content: address, proxied: false,
-  });
-  await dns.upsertRecord(credentials, fleet.zoneId, {
-    type: "MX",
-    name: domain,
-    content: "mail." + domain,
-    priority: 10,
-  });
   const status = await vm.ssh.status();
   if (!status.ssh_enabled) await vm.ssh.enable({ path: "gateway" });
   await vm.ssh.setKey({ public_key: fleet.sshPublicKey, append: true });
@@ -173,9 +162,12 @@ export async function enrollDedicatedVm(row: Service, fleet: DedicatedMailFleet)
   const org = row.organizationId;
   await orderLock(org).run(async () => {
     const current = await repos.managedMail.service(org, row.id);
-    if (current?.order && current.cloudServerId === owned.id && current.orderState === "funded")
+    if (current?.order && !current.order.worker && current.cloudServerId === owned.id && current.orderState === "funded")
       await repos.managedMail.updateOrder(org, row.id, {
-        order: { ...current.order, worker: { id: registered.id, origin: fleet.origin } },
+        order: {
+          ...current.order,
+          worker: { id: registered.id, origin: fleet.origin, customerDns: { ipv6: address } },
+        },
       });
   });
 }

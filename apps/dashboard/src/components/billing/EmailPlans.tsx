@@ -3,7 +3,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  changeMailPlanHref,
   MAIL_PRODUCTS,
   MAIL_PRODUCT_ICONS,
   mailTierPrice,
@@ -12,7 +11,6 @@ import {
 import { Icon } from "@repo/ui/icons";
 import { PricingCard, PricingCardGrid } from "./PricingCard";
 import { useSidebarCollapseRequest } from "@/context/SidebarLayoutContext";
-import { FeatureIllustration } from "@repo/ui/illustrations";
 import { mailDashboardHref } from "@/lib/billing-links";
 import { mailAccountProduct, mailPlanFacts, mailPlanLabel } from "./plan-presentation";
 import { useOptionalCloudPurchase } from "./CloudPurchaseContext";
@@ -30,7 +28,6 @@ import { Button } from "@/components/ui/button";
 import { managedMailApi } from "@/lib/api/managed-mail";
 
 import { MailPlanChange, useMailPlanChange } from "./MailPlanChange";
-import { getActiveOrganizationId } from "@/lib/api/client";
 
 type EmailPlansProps = {
   changeTarget?: string;
@@ -132,6 +129,9 @@ function EmailPlanCatalog({
       : undefined);
   const hostedPurchaseClosed = (mode === "dedicated" ? dedicatedPurchaseClosed : data?.hostedEnrollmentEnabled === false) && !sending &&
     !(service || (target === "account" && subscriptionProduct === "mailboxes"));
+  const pendingTier = mode === "dedicated"
+    ? pendingOrder?.plan
+    : (data?.pendingProduct ?? "mailboxes") === mode ? data?.pendingPlan : undefined;
   const validTarget = target === "account" ? data?.subscriptionTarget === "account" : !!service;
   const change = useMailPlanChange(validTarget ? target : undefined, account.refresh);
   const busy = mutation.busy || change.actions.busy;
@@ -176,125 +176,6 @@ function EmailPlanCatalog({
       )}
       {changeTarget && data && !validTarget && <p role="alert">{t.billing.plansRoute.loadError}</p>}
       {target && <MailPlanChange change={change} />}
-      {!changeTarget && data && (data.plan || data.pendingPlan || data.hasBillingAccount) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-card p-5">
-          <div className="flex items-center gap-3">
-            <FeatureIllustration name="mail" className="illustration-color h-auto w-12" />
-            <span className="font-medium">
-              OpenShip Mail
-              {(data.plan || data.pendingPlan) && " · "}
-              {data.pendingPlan
-                ? interpolate(c.pendingCheckout, {
-                    plan:
-                      productName(data.pendingProduct) +
-                      " · " +
-                      mailPlanLabel(data.pendingPlan, c.included),
-                  })
-                : data.plan &&
-                  productName(activeProduct) + " · " + mailPlanLabel(data.plan, c.included)}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {data.plan && (
-              <Button asChild variant="secondary">
-                <Link href={mailDashboardHref()}>{c.openDashboard}</Link>
-              </Button>
-            )}
-            {data.subscriptionTarget === "account" && (
-              <Button asChild variant="secondary">
-                <Link href={changeMailPlanHref("account", getActiveOrganizationId())}>
-                  {t.billing.workspaces.changePlan}
-                </Link>
-              </Button>
-            )}
-            {data.hasBillingAccount && !data.pendingPlan && (
-              <Button
-                variant="outline"
-                disabled={mutation.busy}
-                onClick={() => open(managedMailApi.portal)}
-              >
-                {t.billing.subscription.manage}
-              </Button>
-            )}
-            {data.pendingPlan && (
-              <>
-                <Button
-                  disabled={mutation.busy || checkoutDisabled || (data.hostedEnrollmentEnabled === false && data.pendingProduct !== "sending")}
-                  onClick={() =>
-                    open(() => managedMailApi.checkout(data.pendingPlan!, data.pendingProduct))
-                  }
-                >
-                  {c.resumeCheckout}
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={mutation.busy}
-                  onClick={async () => {
-                    if (await mutation.execute(managedMailApi.cancelCheckout)) account.refresh();
-                  }}
-                >
-                  {c.cancelCheckout}
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-      {!changeTarget &&
-        data?.services
-          ?.filter((item) => item.plan)
-          .map((item) => (
-            <div
-              key={item.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-card p-4"
-            >
-              <span className="font-medium">
-                {c.dedicatedTitle} · {mailPlanLabel(item.plan, c.included)} · {item.storageGB} GB
-              </span>
-              <div className="flex gap-2">
-                {item.pendingCheckout ? (
-                  <>
-                    <Button
-                      disabled={mutation.busy || checkoutDisabled || dedicatedPurchaseClosed}
-                      onClick={() => open(() => managedMailApi.order(item.id, "resume"))}
-                    >
-                      {c.resumeCheckout}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      disabled={mutation.busy}
-                      onClick={async () => {
-                        if (await mutation.execute(() => managedMailApi.cancelOrder(item.id)))
-                          account.refresh();
-                      }}
-                    >
-                      {c.cancelCheckout}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button asChild variant="secondary">
-                      <Link href={changeMailPlanHref(item.id, getActiveOrganizationId())}>
-                        {t.billing.workspaces.changePlan}
-                      </Link>
-                    </Button>
-                    <Button asChild variant="secondary">
-                      <Link href={mailDashboardHref(item.id)}>
-                        {c.openDashboard}
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={mutation.busy}
-                      onClick={() => open(() => managedMailApi.order(item.id, "portal"))}
-                    >
-                      {t.billing.subscription.manage}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
       {!changeTarget && mail?.products && (
         <div className="grid gap-3 @2xl/pricing:grid-cols-3" role="group" aria-label={c.plans}>
           {MAIL_PRODUCTS.map((product) => (
@@ -311,6 +192,22 @@ function EmailPlanCatalog({
               description={mail.products[product].description}
             />
           ))}
+        </div>
+      )}
+      {!changeTarget && pendingTier && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span>{interpolate(c.pendingCheckout, { plan: mailPlanLabel(pendingTier, c.included) })}</span>
+          <Button disabled={busy || checkoutDisabled || hostedPurchaseClosed} onClick={() => open(() =>
+            mode === "dedicated" && pendingOrder
+              ? managedMailApi.order(pendingOrder.id, "resume")
+              : managedMailApi.checkout(pendingTier, mode)
+          )}>{c.resumeCheckout}</Button>
+          <Button variant="ghost" disabled={busy} onClick={async () => {
+            const result = await mutation.execute(() => mode === "dedicated" && pendingOrder
+              ? managedMailApi.cancelOrder(pendingOrder.id)
+              : managedMailApi.cancelCheckout());
+            if (result) account.refresh();
+          }}>{c.cancelCheckout}</Button>
         </div>
       )}
       {!hostedPurchaseClosed && mode === "mailboxes" && data && !data.service && data.hostingAvailable === false && (

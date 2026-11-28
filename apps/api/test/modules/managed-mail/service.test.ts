@@ -30,8 +30,11 @@ const h = vi.hoisted(() => ({
   resize: vi.fn(),
   vmHandle: vi.fn(),
   dnsWrite: vi.fn(),
+  dnsPlan: vi.fn(),
+  dnsApply: vi.fn(),
   prepare: vi.fn(),
   proof: vi.fn(),
+  ipv6: vi.fn(),
   discoveryTxt: vi.fn(),
   discoveryMx: vi.fn(),
   mail: {
@@ -109,9 +112,15 @@ vi.mock("@repo/platform/engine/modules/dns/registry", async (original) => ({
   ...(await original<object>()),
   resolveDnsProvider: () => ({ upsertRecord: h.dnsWrite }),
 }));
+vi.mock("@repo/platform/engine/modules/dns/dns-credential.service", async original => ({
+  ...(await original<object>()),
+  planRecords: h.dnsPlan,
+  provisionRecords: h.dnsApply,
+}));
 vi.mock("node:dns/promises", async (original) => ({
   ...(await original<typeof import("node:dns/promises")>()),
   resolveTxt: h.proof,
+  resolve6: h.ipv6,
   Resolver: class {
     resolveTxt = h.discoveryTxt;
     resolveMx = h.discoveryMx;
@@ -1110,7 +1119,7 @@ it.each(["slug", "id"] as const)("rejects an inconsistent provider namespace %s 
   expect(h.mail.domains.add).not.toHaveBeenCalled();
 });
 
-it("fulfills the reviewed dedicated order once, retains shared inboxes and pools sending", async () => {
+it.each(["legacy-config", "worker-only"])("requires customer DNS for new dedicated mail with %s and keeps shared inboxes", async mode => {
   const owner = await seedOwner(),
     other = await seedOwner();
   const org = owner.orgId;
@@ -1130,7 +1139,7 @@ it("fulfills the reviewed dedicated order once, retains shared inboxes and pools
   const { engineIdentity } = await import("@repo/platform/engine/modules/managed-mail/service");
   await repos.managedMail.claim({
     organizationId: org,
-    id: "managed-mail-shared-control",
+    id: "managed-mail-shared-control-" + mode,
     engine: engineIdentity(shared),
     hostname: shared.hostname,
     shared: true,
@@ -1213,7 +1222,7 @@ it("fulfills the reviewed dedicated order once, retains shared inboxes and pools
       capacity: checkout.offer.capacity,
     },
   });
-  const vm = { id: "vm-123", namespace: row!.billingNamespace, slug: row!.billingNamespace };
+  const vm = { id: "vm-" + mode, namespace: row!.billingNamespace, slug: row!.billingNamespace };
   h.vmCreate.mockResolvedValue(vm);
   h.vmRead.mockResolvedValue(vm);
   const readSsh = vi.fn(async () => ({
@@ -1243,18 +1252,14 @@ it("fulfills the reviewed dedicated order once, retains shared inboxes and pools
   h.fleet = JSON.stringify({
     origin: "https://worker.test",
     token: "fixture",
-    domain: "fleet.test",
-    webmailIngressIPv4: "192.0.2.10",
     sshPublicKey: "ssh-ed25519 Zml4dHVyZQ==",
-    dnsProvider: "cloudflare",
-    dnsToken: "fixture",
-    zoneId: "fixture",
+    ...(mode === "legacy-config" && { domain: "fleet.test", dnsProvider: "cloudflare", dnsToken: "fixture", zoneId: "fixture" }),
   });
   let registered: object | undefined;
   let installed = false;
   let acknowledged = false;
-  const domain = row!.id + ".fleet.test";
-  const registeredId = "worker-new-mail";
+  const domain = mode + ".example";
+  const registeredId = "worker-new-mail-" + mode;
   let webmailServerId = "another-worker";
   vi.stubGlobal(
     "fetch",
@@ -1326,6 +1331,40 @@ it("fulfills the reviewed dedicated order once, retains shared inboxes and pools
   expect(h.dnsWrite).not.toHaveBeenCalled();
   expect(setKey).not.toHaveBeenCalled();
   await warmMailFleet();
+  const providerDns = (actor: Owner, action: string, stage: string, name = domain) =>
+    call(actor, selected + "/inbox-domain/dns/" + action, { domain: name, stage });
+  const aaaa = { type: "AAAA", name: "mail." + domain, content: networkState.address, proxied: false };
+  h.dnsPlan.mockResolvedValue({ status: "none", records: [] });
+  h.dnsApply.mockResolvedValue({ provisioned: true, records: [] });
+  {
+    expect(h.dnsPlan).not.toHaveBeenCalled();
+    expect(h.dnsApply).not.toHaveBeenCalled();
+    expect((await providerDns(other, "apply", "setup")).status).toBe(404);
+    expect((await providerDns(owner, "apply", "receiving")).status).toBe(409);
+    expect((await providerDns(owner, "plan", "setup")).status).toBe(200);
+    const setupRecords = [
+      { type: "TXT", name: "_openship-mail." + domain, content: "openship-mail=" + row!.id, append: true }, aaaa,
+    ];
+    expect(h.dnsPlan).toHaveBeenCalledWith(org, domain, setupRecords);
+    expect(h.dnsApply).not.toHaveBeenCalled();
+    expect((await providerDns(owner, "apply", "setup")).status).toBe(200);
+    expect(h.dnsApply).toHaveBeenCalledExactlyOnceWith(org, domain, setupRecords);
+    expect((await (await call(owner, selected)).json()).service.customerDns).toEqual({ ipv6: networkState.address });
+    const configure = (actor: Owner) => call(actor, selected + "/inbox-domain", { domain }, "PUT");
+    expect((await configure(other)).status).toBe(404);
+    h.proof.mockResolvedValue([]);
+    expect((await configure(owner)).status).toBe(409);
+    h.proof.mockResolvedValue([["openship-mail=" + row!.id]]);
+    h.ipv6.mockResolvedValue(["2001:db8::1"]);
+    expect((await configure(owner)).status).toBe(409);
+    h.ipv6.mockResolvedValue(["2001:db8:0:0:0:0:0:123"]);
+    expect((await configure(owner)).status).toBe(200);
+    expect((await configure(owner)).status).toBe(200);
+    expect(registered).toBeDefined();
+    expect(installed).toBe(false);
+    expect((await providerDns(owner, "apply", "setup")).status).toBe(409);
+    expect((await providerDns(owner, "apply", "receiving")).status).toBe(409);
+  }
   await warmMailFleet();
   await warmMailFleet();
   expect((await repos.managedMail.service(owner.orgId, row!.id))?.provisioning).toBe(true);
@@ -1346,14 +1385,18 @@ it("fulfills the reviewed dedicated order once, retains shared inboxes and pools
   });
   expect(expose).toHaveBeenCalledTimes(2);
   expect(expose).toHaveBeenLastCalledWith({ enabled: true, expected_revision: 2 });
-  expect(h.dnsWrite).not.toHaveBeenCalledWith(expect.anything(), "fixture", expect.objectContaining({ name: "webmail." + domain }));
-  expect(h.dnsWrite).not.toHaveBeenCalledWith(expect.anything(), "fixture",
-    expect.objectContaining({ type: "A", name: "mail." + domain }));
-  expect(h.dnsWrite).toHaveBeenCalledWith(
-    expect.anything(),
-    "fixture",
-    expect.objectContaining({ type: "TXT", name: "dkim._domainkey." + domain }),
-  );
+  expect(h.dnsWrite).not.toHaveBeenCalled();
+  {
+    expect((await providerDns(owner, "apply", "receiving", "other.example")).status).toBe(409);
+    expect((await providerDns(owner, "apply", "receiving")).status).toBe(200);
+    expect(h.dnsApply).toHaveBeenLastCalledWith(org, domain, [
+      aaaa, { type: "MX", name: domain, content: "mail." + domain, priority: 10 },
+    ]);
+    const admin = "/admin/" + row!.id;
+    expect(await (await call(owner, admin + "/domains")).json()).toEqual({ domains: [{ domain }] });
+    expect((await call(owner, admin + "/domains/" + domain, undefined, "DELETE")).status).toBe(409);
+    expect((await call(owner, admin + "/mailboxes/postmaster@" + domain, undefined, "DELETE")).status).toBe(404);
+  }
   const dedicated = await (await call(owner, selected)).json();
   expect(dedicated).toMatchObject({
     plan: "team",
@@ -1364,7 +1407,7 @@ it("fulfills the reviewed dedicated order once, retains shared inboxes and pools
   const base = await (await call(owner, "/managed")).json();
   expect(base).toMatchObject({
     plan: "solo",
-    service: { id: "managed-mail-shared-control" },
+    service: { id: "managed-mail-shared-control-" + mode },
     limits: { recipients: 30000, mailboxes: 1 },
     sendingAllowance: 30000,
   });

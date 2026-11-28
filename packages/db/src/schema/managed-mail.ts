@@ -36,7 +36,7 @@ export type DedicatedMailOrder = {
   memoryMB: number;
   diskGB: number;
   allowance?: { recipients: number; dailyRecipients: number; domains: number };
-  worker?: { id: string; origin: string };
+  worker?: { id: string; origin: string; customerDns?: { ipv6: string; domain?: string } };
   /** Kept after app deletion so fulfillment never recreates a customer-deleted project. */
   webmailProjectId?: string;
   webmailOwner?: "customer";

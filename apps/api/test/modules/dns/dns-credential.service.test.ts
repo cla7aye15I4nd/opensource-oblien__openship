@@ -334,6 +334,15 @@ describe("planRecords", () => {
     expect(out.records[0]?.current).toBe("192.0.2.1");
   });
 
+  it("turns off proxying on a mail host even when its address already matches", async () => {
+    const input = [{ type: "AAAA" as const, name: "mail.example.com", content: "2001:db8::1", proxied: false }];
+    provider.listRecords.mockResolvedValue([rec({ ...input[0], proxied: true })]);
+    expect((await planRecords("org_1", "example.com", input)).records[0]?.action).toBe("update");
+    expect(provider.upsertRecord).not.toHaveBeenCalled();
+    expect((await provisionRecords("org_1", "example.com", input)).provisioned).toBe(true);
+    expect(provider.upsertRecord).toHaveBeenCalled();
+  });
+
   it("classifies our own stale record as update — safe to rewrite in place", async () => {
     provider.listRecords.mockResolvedValue([rec({ content: "192.0.2.99" })]);
     const out = await plan1();

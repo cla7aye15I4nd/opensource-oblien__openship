@@ -5372,6 +5372,21 @@
       "section": "Hosted mail",
       "description": "Read the selected mail service and its provisioning state."
     },
+    "PUT /api/mail/managed/services/:serverId/inbox-domain": {
+      "page": "mail",
+      "section": "Hosted mail",
+      "description": "Verify the customer’s ownership TXT and dedicated mail host AAAA, then bind the domain to the paid VM."
+    },
+    "POST /api/mail/managed/services/:serverId/inbox-domain/dns/plan": {
+      "page": "mail",
+      "section": "Hosted mail",
+      "description": "Preview the setup or receiving records using the workspace’s connected DNS provider."
+    },
+    "POST /api/mail/managed/services/:serverId/inbox-domain/dns/apply": {
+      "page": "mail",
+      "section": "Hosted mail",
+      "description": "Apply the selected DNS stage. Setup publishes the proof and VM address. Receiving publishes the mail host and MX after installation."
+    },
     "POST /api/mail/managed/checkout": {
       "page": "mail",
       "section": "Hosted mail",

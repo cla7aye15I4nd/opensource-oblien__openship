@@ -12,6 +12,7 @@ import {
 } from "@repo/contracts";
 import { createProvisionLock } from "@repo/platform/engine/lib/provision-lock";
 import { requireMailEntitlement } from "@repo/platform/engine/modules/managed-mail/service";
+import { PLATFORM_LOCAL_PART } from "@repo/platform/engine/modules/mail/admin/platform-mailbox.service";
 import { validateMailDomain } from "@repo/platform/engine/modules/mail/mail-domain";
 import { getRequestContext } from "../../lib/request-context";
 
@@ -48,23 +49,40 @@ export async function managedAccount(c: Context, pattern: string, engine: MailTa
       ? await readMailRequestBody(c)
       : undefined;
   const requestedDomains = mailRequestDomains(c, body);
-  if (requestedDomains.includes(primary) || new Set(requestedDomains).size > 1) notFound();
+  const ownsPrimary = !engine.tenant && engine.customerDomain === primary;
+  if ((!ownsPrimary && requestedDomains.includes(primary)) || new Set(requestedDomains).size > 1) notFound();
   const domain = requestedDomains[0] ?? "";
+
+  const reservedAddress = (address: string) =>
+    address === `postmaster@${primary}` || address === `${PLATFORM_LOCAL_PART}@${primary}`;
+  if (ownsPrimary && domain === primary) {
+    // The installation's domain and operator mailboxes are permanent infrastructure.
+    const email = c.req.param("email")?.toLowerCase() ?? String(body?.localPart ?? "").trim().toLowerCase() + "@" + primary;
+    if (reservedAddress(email)) notFound();
+    if (method !== "GET" && (pattern.endsWith("/domains/:domain") || path === root + "/domains"))
+      throw new AppError("The installation domain must stay active on this server.", 409);
+  }
 
   async function domains() {
     const { domains } = await engineRequest<{ domains: Array<{ domain: string }> }>(
       engine,
       root + "/domains",
     );
-    return domains.filter((item) => item.domain !== primary);
+    return ownsPrimary ? domains : domains.filter((item) => item.domain !== primary);
   }
   if (method === "GET" && path === root + "/domains") return c.json({ domains: await domains() });
 
   if (method === "GET") {
-    if (path === root + "/stats")
-      return c.json(
-        await engineRequest<object>(engine, path + "?excludeDomain=" + encodeURIComponent(primary) + (c.req.query("inbox") === "1" ? "&inbox=1" : "")),
-      );
+    if (path === root + "/stats") {
+      const statsQuery = new URLSearchParams();
+      if (!ownsPrimary) statsQuery.set("excludeDomain", primary);
+      if (c.req.query("inbox") === "1") statsQuery.set("inbox", "1");
+      return c.json(await engineRequest<object>(engine, statsQuery.size ? path + "?" + statsQuery : path));
+    }
+    if (ownsPrimary && domain === primary && path === root + "/mailboxes") {
+      const { mailboxes } = await engineRequest<{ mailboxes: Array<{ username: string }> }>(engine, path + suffix);
+      return c.json({ mailboxes: mailboxes.filter(box => !reservedAddress(box.username)) });
+    }
     if (pattern.endsWith("/domains/:domain/dns"))
       return c.json(publicDns(await engineRequest<DomainDns>(engine, path)));
     if (path === root + "/domains-dns/pending") {
@@ -90,11 +108,11 @@ export async function managedAccount(c: Context, pattern: string, engine: MailTa
       };
     }
     if (!engine.tenant && pattern.endsWith("/aliases/:id")) {
-      const { aliases } = await engineRequest<{ aliases: Array<{ id: number }> }>(
+      const { aliases } = await engineRequest<{ aliases: Array<{ id: number; address: string }> }>(
         engine,
         root + "/aliases?domain=" + encodeURIComponent(primary),
       );
-      if (aliases.some((alias) => alias.id === Number(c.req.param("id")))) notFound();
+      if (aliases.some((alias) => alias.id === Number(c.req.param("id")) && (!ownsPrimary || reservedAddress(alias.address)))) notFound();
     }
     if (path === root + "/domains" && method === "POST") {
       const { plan, allowance } = await requireMailEntitlement(ctx.organizationId, serverId);
@@ -126,7 +144,7 @@ export async function managedAccount(c: Context, pattern: string, engine: MailTa
               ),
             ),
           )
-        ).flatMap((item) => item.mailboxes);
+        ).flatMap((item) => item.mailboxes).filter(box => !reservedAddress(box.username));
         if (method === "POST" && limits.mailboxes !== null && boxes.length >= limits.mailboxes)
           limit("Your plan’s mailbox allowance is full.");
         const others = boxes.filter((box) => box.username !== c.req.param("email")?.toLowerCase());

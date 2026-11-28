@@ -1,3 +1,4 @@
+import { isValidCustomHostname, mailHostname } from "@repo/core";
 import type { BillingPlanChangeQuote } from "./billing";
 import { Type, type Static } from "@sinclair/typebox";
 
@@ -55,6 +56,19 @@ export function managedMailDomainProof(serviceId: string, domain: string) {
     value: "openship-mail=" + serviceId,
   };
 }
+export function isValidInboxDomain(domain: string) {
+  return !domain.startsWith("*.") && isValidCustomHostname(domain) && mailHostname(domain).length <= 253;
+}
+
+export function dedicatedInboxRecords(serviceId: string, domain: string, ipv6: string) {
+  const name = mailHostname(domain);
+  return {
+    ownership: { type: "TXT" as const, ...managedMailDomainProof(serviceId, domain) },
+    aaaa: { type: "AAAA" as const, name, value: ipv6 },
+    mx: { type: "MX" as const, name: domain, value: name, priority: 10 },
+  };
+}
+
 type MailboxHost = { placement: MailPlacement; cloudServerId?: string; mailboxStorageMB?: number };
 
 export function managedMailboxCapacity(
@@ -100,7 +114,7 @@ export interface ManagedMailSummary {
   hostingAvailable?: boolean;
   reservedHostingAvailable?: boolean;
   service:
-    | (MailboxHost & { id: string; webmailProjectId?: string } & (
+    | (MailboxHost & { id: string; webmailProjectId?: string; customerDns?: { ipv6: string; domain?: string } } & (
           | { provisioning: "payment" | "vm" | "network" | "install" }
           | { provisioning?: undefined; hostname: string; webmailUrl: string | null }
         ))
@@ -133,6 +147,12 @@ export const SendingDomainInput = Type.Object(
   },
   { additionalProperties: false },
 );
+export const InboxDnsInput = Type.Object({
+  ...SendingDomainInput.properties,
+  stage: Type.Union([Type.Literal("setup"), Type.Literal("receiving")]),
+}, { additionalProperties: false });
+export type InboxDnsRequest = Static<typeof InboxDnsInput>;
+
 export type SendingDomainRequest = Static<typeof SendingDomainInput>;
 export const MailRelayKeyInput = Type.Object({
   installation: Type.String({ pattern: "^[a-f0-9]{64}$" }),

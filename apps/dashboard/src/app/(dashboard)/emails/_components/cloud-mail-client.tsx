@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { type ManagedMailSummary, type MailPlacement } from "@repo/contracts/managed-mail";
+import { dedicatedInboxRecords, type ManagedMailSummary, type MailPlacement } from "@repo/contracts/managed-mail";
 import { getActiveOrganizationId, subscribeActiveOrganization } from "@/lib/api/client";
 import { managedMailApi } from "@/lib/api/managed-mail";
 import { getApiErrorMessage } from "@/lib/api";
 import { useScopedMutation } from "@/hooks/use-scoped-resource";
 import { mailPlanLabel } from "@/components/billing/plan-presentation";
 import { Icon } from "@repo/ui/icons";
+import { DedicatedInboxSetup } from "./dedicated-inbox-setup";
 import { CloudMailSetup } from "./cloud-mail-setup";
 import DropdownMenu from "@/components/ui/DropdownMenu";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -187,7 +188,9 @@ function CloudMailService({
       : instanceHref;
   const go = (target: string) => router.push(target, { scroll: false });
   const markSendingConfigured = () => setData(current => current && { ...current, sendingConfigured: true });
-  const provisioning = service?.provisioning && (
+  const provisioning = service?.provisioning && (service.customerDns ? (
+    <DedicatedInboxSetup serviceId={service.id} dns={service.customerDns} onVerified={() => setAttempt(n => n + 1)} />
+  ) : (
     <div className="space-y-3 rounded-2xl bg-card p-5 text-sm">
       <p role="status">
         {service.provisioning === "payment"
@@ -229,7 +232,7 @@ function CloudMailService({
         </Button>
       )}
     </div>
-  );
+  ));
   return (
     <PageContainer>
       {backHref && (
@@ -391,7 +394,7 @@ function CloudMailService({
             </Button>
           )}
         </>
-      ) : service?.provisioning && !data?.plan ? provisioning : service && !service.provisioning ? (
+      ) : service?.provisioning && (service.customerDns || !data?.plan) ? provisioning : service && !service.provisioning ? (
         <MailAdminPanel
           key={service.id}
           managed
@@ -401,6 +404,7 @@ function CloudMailService({
           status={{
             active: false,
             steps: [],
+            ...(service.customerDns?.domain && { dnsRecords: dedicatedInboxRecords(service.id, service.customerDns.domain, service.customerDns.ipv6) }),
             domain: service.hostname.replace(/^mail\./, ""),
             webmail: service.webmailUrl ? {
               installed: true,

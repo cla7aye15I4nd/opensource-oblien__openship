@@ -1240,6 +1240,7 @@ beside Monthly sending. The Sending tab shows those details inline.
 
 Use three product cards in Billing and on the public pricing pages. Shared mailboxes, dedicated
 mail servers and the Sending API use the compute pricing-card layout and the catalog’s popular tier.
+Keep the pricing catalog focused on product selection and tier cards. Show the current tier on its card and keep dashboard and billing management actions in the plan detail view.
 Dedicated checkout reviews one monthly total, itemizing the new VM, usable mailbox storage and
 sending allowance. Each dedicated purchase opens an independent service in the same Emails panel.
 For an existing paid subscription, **Change plan** in Emails and Billing opens the plan cards

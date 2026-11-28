@@ -126,18 +126,22 @@ Dedicated mail is a separate monthly capacity subscription. In **Billing → Ema
 
 Mindwire is optional on dedicated mail. Configure the assistant-only runtime engine on the dedicated VM, then each mailbox owner can connect a provider in webmail. For an existing worker-owned dedicated installation, update Cloud and the worker, redeploy the linked webmail on the same VM through `/api/mail/webmail/deploy-project` with `dedicatedAssistant: true`, then repeat `PUT /api/mail/admin/:serverId/webmail/hosting` with the existing service namespace, pinned IMAP hostname as `imapHost`, and `dedicated: true`. This preserves the current catalog installation's mailbox data and sending keys. [Mail assistant deployment setup](MAIL-AGENTS.md#deployment-setup-once-per-mail-installation)
 
-For automatic enrollment, set `OPENSHIP_MAIL_DEDICATED_FLEET` on the SaaS API. It accepts a JSON object with the following fields.
+For customer-managed DNS, set only `origin`, `token` and `sshPublicKey` in `OPENSHIP_MAIL_DEDICATED_FLEET`. After checkout the customer selects their domain in Emails. OpenShip verifies the service ownership TXT and the AAAA pointing to the paid VM, then installs the engine. The customer can create inboxes before switching their MX to the hostname shown in Domains. Webmail uses the ordinary Apps route. Sending verification stays in the Sending tab.
+
+Existing worker registrations using operator-owned technical hostnames can retain their original DNS settings. New orders always use customer-managed DNS. Customers can optionally preview and apply the displayed records through their workspace’s connected DNS provider.
+
+To configure the worker, set `OPENSHIP_MAIL_DEDICATED_FLEET` on the SaaS API. It accepts a JSON object with the following fields.
 
 | Field | Value |
 | --- | --- |
 | `origin`, `token` | HTTPS origin of the OpenShip self-hosted worker and a private operator-organization token permitted to register servers and manage mail and webmail |
 | `sshPublicKey` | Ed25519 public key for the SSH agent on that worker, which reaches new VMs through the Oblien SSH bastion |
-| `domain` | Operator-controlled DNS suffix for dedicated servers |
-| `dnsProvider`, `dnsToken`, `zoneId` | Cloudflare or DigitalOcean provider name (`cloudflare` or `digitalocean`), zone-scoped DNS token and authoritative zone ID |
+| `domain` | Legacy registrations only. Operator-controlled DNS suffix |
+| `dnsProvider`, `dnsToken`, `zoneId` | Legacy registrations only. Cloudflare or DigitalOcean provider name (`cloudflare` or `digitalocean`), zone-scoped DNS token and authoritative zone ID |
 
-Run `bun run --cwd apps/api cloud:check --dedicated-mail-fleet` with the deployed SaaS environment to check billing, the configured fleet, worker inventory access and DNS zone read access. To review the local configuration, run `bun --env-file=.env.local-saas scripts/cloud-readiness.ts --dedicated-mail-fleet` from `apps/api`. These checks are read-only. A live purchase on a pilot domain exercises VM creation, DNS writes, certificate issuance and inbox delivery.
+Run `bun run --cwd apps/api cloud:check --dedicated-mail-fleet` with the deployed SaaS environment to check billing, the configured fleet, worker inventory access and, for legacy configurations, DNS zone read access. To review the local configuration, run `bun --env-file=.env.local-saas scripts/cloud-readiness.ts --dedicated-mail-fleet` from `apps/api`. These checks are read-only. A live purchase on a pilot domain exercises VM creation, customer DNS verification, certificate issuance and inbox delivery.
 
-The fleet uses the immutable VM returned for the paid order. It enables inbound IPv6 for SMTP, submission, IMAP and web traffic, publishes the technical hostnames and MX, registers the target with the worker and runs the existing Compose mail installer. The installer publishes DKIM through the fleet and checks the engine’s DNS and certificate. Cloud links the funded VM as an Apps destination and installs Webmail with the normal Apps installer. This automatic network path requires an IPv6-capable provider node and clients. For IPv4 reachability, provision inbound IPv4 routing for the technical hostname. Oblien handles outbound delivery through the managed relay.
+The fleet uses the immutable VM returned for the paid order. It enables inbound IPv6 for SMTP, submission, IMAP and web traffic, registers the target with the worker and runs the existing Compose mail installer. The customer verifies ownership and the VM address before installation. Cloud links the funded VM as an Apps destination and installs Webmail with the normal Apps installer. This automatic network path requires an IPv6-capable provider node and clients. For IPv4 reachability, provision inbound IPv4 routing for the technical hostname. Oblien handles outbound delivery through the managed relay.
 
 For an operator-routed installation, supply a dedicated `OPENSHIP_MAIL_ENGINES` entry whose `providerVmId` matches the purchased VM's immutable Oblien ID. Supply the routed mail hostname, worker origin, worker server ID, token and webmail URL. Existing private installations registered by `cloudServerId` continue to use their original worker. Previously reserved hosts can still activate under their operator grant.
 

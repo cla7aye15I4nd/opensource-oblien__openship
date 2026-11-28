@@ -498,6 +498,9 @@ Use `--schema` for JSON configuration commands. Mail is a remote, self-hosted fe
 | Activate mailbox hosting in the selected placement. | HTTP only | `POST /api/mail/managed`<br />`billing:admin` |
 | Cancel an unused VM mail reservation. | HTTP only | `DELETE /api/mail/managed/:serverId/reservation`<br />`billing:admin` |
 | Read the selected mail service and its provisioning state. | HTTP only | `GET /api/mail/managed/services/:serverId`<br />`mail_server:list` |
+| Verify the customer’s ownership TXT and dedicated mail host AAAA, then bind the domain to the paid VM. | HTTP only | `PUT /api/mail/managed/services/:serverId/inbox-domain`<br />`mail_server:admin` |
+| Preview the setup or receiving records using the workspace’s connected DNS provider. | HTTP only | `POST /api/mail/managed/services/:serverId/inbox-domain/dns/plan`<br />`mail_server:admin` |
+| Apply the selected DNS stage. Setup publishes the proof and VM address. Receiving publishes the mail host and MX after installation. | HTTP only | `POST /api/mail/managed/services/:serverId/inbox-domain/dns/apply`<br />`mail_server:admin` |
 | Start checkout for a shared mailbox plan, sending allowance, or dedicated mail server. | HTTP only | `POST /api/mail/managed/checkout`<br />`billing:admin` |
 | Cancel a pending email checkout. | HTTP only | `POST /api/mail/managed/checkout/cancel`<br />`billing:admin` |
 | Read the current plan change. | HTTP only | `GET /api/mail/managed/plans/:id/change`<br />`billing:read` |

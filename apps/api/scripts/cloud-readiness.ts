@@ -26,13 +26,15 @@ if (process.argv.includes("--dedicated-mail-fleet")) {
     record("Automatic dedicated mail fleet configured", false, "Check the dedicated fleet settings.");
   }
   if (fleet) {
-    const { resolveDnsProvider } = await import("@repo/platform/engine/modules/dns/registry");
-    const [worker, dns] = await Promise.allSettled([
-      listDedicatedWorkerServers(fleet),
-      resolveDnsProvider(fleet.dnsProvider).listRecords({ apiToken: fleet.dnsToken }, fleet.zoneId, { name: fleet.domain, type: "MX" }),
-    ]);
+    const [worker] = await Promise.allSettled([listDedicatedWorkerServers(fleet)]);
     record("Dedicated mail worker inventory readable", worker.status === "fulfilled");
-    record("Dedicated mail DNS zone readable", dns.status === "fulfilled");
+    if (fleet.dns) {
+      const { resolveDnsProvider } = await import("@repo/platform/engine/modules/dns/registry");
+      const [dns] = await Promise.allSettled([
+        resolveDnsProvider(fleet.dns.provider).listRecords({ apiToken: fleet.dns.token }, fleet.dns.zoneId, { name: fleet.dns.domain, type: "MX" }),
+      ]);
+      record("Dedicated mail DNS zone readable", dns.status === "fulfilled");
+    }
   }
 }
 const checks = await Promise.allSettled([

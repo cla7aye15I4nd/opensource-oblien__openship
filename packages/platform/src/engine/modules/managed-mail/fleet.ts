@@ -58,14 +58,18 @@ export async function prepareMailEngine(engine: MailEngine, customerOwnsApp = fa
       throw new AppError("Inspect the existing mail installation before adding this slot.", 409);
   }
   if (status.dnsRecords && !status.dnsAcknowledged) {
-    if (engine.providerVmId && status.dnsRecords.dkim)
-      await publishDedicatedDkim(engine, status.dnsRecords.dkim);
-    const { checks } = await engineRequest<{ checks: Array<{ key: string; status: string }> }>(
-      engine,
-      "/admin/" + id + "/dns-scan",
-    );
-    const passes = (key: string) => checks.some((row) => row.key === key && row.status === "pass");
-    if (!passes("mx") || !passes("dkim")) return;
+    if (!engine.customerDomain) {
+      if (engine.providerVmId && status.dnsRecords.dkim)
+        await publishDedicatedDkim(engine, status.dnsRecords.dkim);
+      const { checks } = await engineRequest<{ checks: Array<{ key: string; status: string }> }>(
+        engine,
+        "/admin/" + id + "/dns-scan",
+      );
+      const passes = (key: string) => checks.some((row) => row.key === key && row.status === "pass");
+      if (!passes("mx") || !passes("dkim")) return;
+    }
+    // For a customer domain the service-specific TXT and VM address were verified
+    // before setup. The customer can cut over MX after creating their inboxes.
     await engineRequest(engine, "/setup/dns-ack", "POST", { serverId: id });
   }
   const response = await engineResponse(

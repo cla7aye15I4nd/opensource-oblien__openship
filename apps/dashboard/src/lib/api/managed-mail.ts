@@ -3,6 +3,7 @@ import type {
   MailPlanChangeQuote,
   MailChangeSelection,
   ManagedMailSummary,
+  InboxDnsRequest,
   ManagedMailReceipt,
   ManagedTestEmailRequest,
   MailPlacement,
@@ -12,10 +13,13 @@ import type {
   SendingIdentityKind,
   SendingUsageSnapshot,
 } from "@repo/contracts";
+import type { DnsPlanResult, DnsProvisionResult } from "./dns";
 import { api } from "./client";
 
 const changePath = (target: string) =>
   "mail/managed/plans/" + encodeURIComponent(target) + "/change";
+
+const inboxDomainPath = (id: string) => "mail/managed/services/" + encodeURIComponent(id) + "/inbox-domain";
 
 export const managedMailApi = {
   previewChange: (target: string, input: MailChangeSelection) =>
@@ -42,6 +46,12 @@ export const managedMailApi = {
   release: (id: string) => api.delete("mail/sending/domains/" + encodeURIComponent(id)),
   summary: (serviceId?: string | null) =>
     api.get<ManagedMailSummary>(serviceId ? "mail/managed/services/" + encodeURIComponent(serviceId) : "mail/managed"),
+  configureInboxDomain: (id: string, domain: string) =>
+    api.put<{ domain: string }>(inboxDomainPath(id), { domain }),
+  inboxDnsPlan: (id: string, input: InboxDnsRequest) =>
+    api.post<{ data: DnsPlanResult }>(inboxDomainPath(id) + "/dns/plan", input),
+  inboxDnsApply: (id: string, input: InboxDnsRequest) =>
+    api.post<{ data: DnsProvisionResult }>(inboxDomainPath(id) + "/dns/apply", input),
   order: (id: string, action: "resume" | "portal") =>
     api.post<{ url: string }>("mail/managed/services/" + encodeURIComponent(id) + "/" + action),
   cancelOrder: (id: string) =>
