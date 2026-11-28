@@ -161,6 +161,7 @@ function CloudMailService({
   );
   const existingMailHost = data?.services?.find(item => !item.pendingCheckout) ?? data?.services?.[0];
   const service = data?.service;
+  const webmail = service && !service.provisioning && service.webmailUrl ? new URL(service.webmailUrl) : null;
   const checkoutError = service?.provisioning === "payment" ? checkout.error : null;
   const capacity = data?.limits;
   const requestedView = params.get("mailView");
@@ -263,10 +264,11 @@ function CloudMailService({
         </div>
         {data && !connecting && !access && (
           <div className="flex flex-wrap items-center gap-2">
-            {service && !service.provisioning && service.webmailUrl && (
+            {webmail && (
               <Button asChild>
-                <a href={service.webmailUrl} target="_blank" rel="noopener noreferrer">
-                  {t.emailsAdmin.overview.openWebmail}<Icon name="arrow-up-right" />
+                <a href={webmail.href} target="_blank" rel="noopener noreferrer"
+                  aria-label={`${t.emailsAdmin.overview.openWebmail} (${webmail.host})`}>
+                  <bdi className="max-w-[60vw] truncate">{webmail.host}</bdi><Icon name="arrow-up-right" />
                 </a>
               </Button>
             )}
@@ -327,7 +329,7 @@ function CloudMailService({
               )}
               {data.services.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.hostname ??
+                  {item.placement === "standard" ? copy.sharedTitle : item.hostname ??
                     (item.plan
                       ? copy.dedicatedTitle + " · " + item.plan + " · " + item.id.slice(-6)
                       : copy.sharedTitle)}
@@ -400,16 +402,15 @@ function CloudMailService({
           limits={capacity}
           sendingConfigured={data?.sendingConfigured}
           serverId={service.id}
+          mailHost={service.hostname}
           status={{
             active: false,
             steps: [],
-            ...(service.customerDns?.domain && { dnsRecords: dedicatedInboxRecords(service.id, service.customerDns.domain, service.customerDns.ipv6) }),
-            domain: service.hostname.replace(/^mail\./, ""),
-            webmail: service.webmailUrl ? {
-              installed: true,
-              url: service.webmailUrl,
-              hostname: new URL(service.webmailUrl).hostname,
-            } : undefined,
+            ...(service.customerDns?.domain && {
+              domain: service.customerDns.domain,
+              dnsRecords: dedicatedInboxRecords(service.id, service.customerDns.domain, service.customerDns.ipv6),
+            }),
+            webmail: webmail ? { installed: true, url: webmail.href, hostname: webmail.hostname } : undefined,
           }}
           onRefresh={() => setAttempt((n) => n + 1)}
           onForgotten={() => setAttempt((n) => n + 1)}

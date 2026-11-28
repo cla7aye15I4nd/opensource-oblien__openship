@@ -16,6 +16,7 @@ export {
   mailServerRouteHostnames,
   MAIL_HOST_LABEL,
   mailHostname,
+  publishedMailHostname,
   apiMailHostname,
   autodiscoverHostname,
   mailHostBaseDomain,

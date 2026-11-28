@@ -1221,13 +1221,14 @@ The hosted dashboard has Overview, Mailboxes, Domains and Sending tabs. Each
 domain links to its DNS records and mailbox list. The overview shows plan usage and
 the number of messages in the IMAP Inbox across the service, per domain and per mailbox.
 Use one Mailbox activity header above the two-column mailbox grid. Show the Inbox total for the current
-selection beside the heading. For multiple domains, put the domain switch in its own compact card above Mail server in the right column.
+selection beside the heading. For multiple domains, put the domain switch in its own compact card above the protocol settings in the right column.
 On narrow hosted dashboards it sits directly above the mailbox activity. Its options include domain counts and it scopes
 the grid from the same Inbox snapshot. Each live address opens its domain’s mailbox list. Hosted mailbox cards
 show accepted and pending recipients against the sender’s monthly cap or the shared workspace allowance.
 The Sending tab uses the same control for each sender domain. Billing admins can set a cap, block sending
-with a zero cap, or clear the cap to inherit the allowance. Other readers see usage. The Mail server card sits beside
-activity on wide screens and immediately below the usage cards on narrow hosted dashboards.
+with a zero cap, or clear the cap to inherit the allowance. Other readers see usage. Hosted dashboards link to the
+published webmail address in the header. Once the workspace has an active mailbox, its IMAP and SMTP hostname
+and ports are available under **Protocol settings** beside mailbox activity.
 Load additional mailbox cards on demand.
 In the Mailboxes table, use a labeled Manage menu for password changes, mailbox settings and deletion.
 A password change has its own form. Delete opens a confirmation with the mailbox address.

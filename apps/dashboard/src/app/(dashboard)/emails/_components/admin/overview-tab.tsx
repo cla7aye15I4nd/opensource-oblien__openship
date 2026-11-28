@@ -20,7 +20,6 @@ import { useSendingLimits } from "./sending-limits";
 import { useResourceScope } from "@/hooks/use-scoped-resource";
 import { SendingQuotaCard, useSendingUsage } from "./sending-usage";
 import { MailboxActivity, type MailActivitySidebar } from "./mailbox-activity";
-import { FeatureIllustration } from "@repo/ui/illustrations";
 import type { MailTabKey } from "@/lib/mail-tabs";
 import type { ManagedMailSummary } from "@repo/contracts/managed-mail";
 import { useI18n } from "@/components/i18n-provider";
@@ -38,24 +37,17 @@ interface OverviewTabProps {
   sectionHref: (tab: MailTabKey, domain?: string | null) => string;
   status?: MailSetupStatus;
   serverId?: string;
+  mailHost?: string;
   setup?: MailSetupPanels;
 }
 
 export function OverviewTab(props: OverviewTabProps) {
-  const { managed, serverId, status, sectionHref, setup } = props;
-  const mailHost = status?.domain ? mailHostname(status.domain) : "";
+  const { managed, serverId } = props;
   const scope = useResourceScope();
-  const renderSidebar: MailActivitySidebar = domainSwitch => (
-    <aside className={`flex min-w-0 flex-col gap-4 @min-[44rem]/mail-overview:col-start-2 @min-[44rem]/mail-overview:row-start-2 ${managed ? "row-start-2" : ""}`}>
-      {serverId ? <MailServerCard managed={managed} mailHost={mailHost} serverId={serverId} webmail={status?.webmail} /> : setup && <SenderDomainsSummary {...setup.senderDomains} />}
-      {!managed && <QuickActionsCard sectionHref={sectionHref} />}
-      {domainSwitch}
-    </aside>
-  );
   return (
     <div className="@container/mail-overview space-y-5">
-      <div className="grid min-w-0 items-start gap-4 @min-[44rem]/mail-overview:grid-cols-[minmax(0,1fr)_clamp(16rem,32%,22rem)]">
-        <LiveMailActivity key={scope + ":" + serverId} {...props} renderSidebar={renderSidebar} />
+      <div className="grid min-w-0 items-start gap-4 @min-[44rem]/mail-overview:has-[>aside]:grid-cols-[minmax(0,1fr)_clamp(16rem,32%,22rem)]">
+        <LiveMailActivity key={scope + ":" + serverId} {...props} />
       </div>
       {!managed && <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(245px,1fr)]">
         <SetupGuidesBanner /><CalendarContactsCard />
@@ -66,12 +58,24 @@ export function OverviewTab(props: OverviewTabProps) {
 
 type SectionHref = OverviewTabProps["sectionHref"];
 
-function LiveMailActivity({ renderSidebar, managed, serverId, limits, sendingConfigured, onSendingActivated, sectionHref, setup }: OverviewTabProps & { renderSidebar: MailActivitySidebar }) {
+function LiveMailActivity({ managed, serverId, mailHost, status, limits, sendingConfigured, onSendingActivated, sectionHref, setup }: OverviewTabProps) {
   const { stats, loading, blocked, error, refresh } = useOverviewStats(serverId);
   const { t } = useI18n();
   const caps = useSendingLimits("senders", !!managed && !!serverId, limits?.recipients, onSendingActivated);
   const configured = !!sendingConfigured || caps.configured;
   const usage = useSendingUsage(!!managed && configured);
+  const showServer = serverId && (!managed || (stats?.mailboxes.active ?? 0) > 0);
+  const renderSidebar: MailActivitySidebar = domainSwitch => {
+    if (managed && !showServer && !setup && !domainSwitch) return null;
+    return (
+      <aside className={`flex min-w-0 flex-col gap-4 @min-[44rem]/mail-overview:col-start-2 @min-[44rem]/mail-overview:row-start-2 ${managed ? "row-start-2" : ""}`}>
+        {showServer && <MailServerCard managed={managed} mailHost={mailHost ?? (status?.domain ? mailHostname(status.domain) : "")} serverId={serverId} webmail={status?.webmail} />}
+        {setup && <SenderDomainsSummary {...setup.senderDomains} />}
+        {!managed && <QuickActionsCard sectionHref={sectionHref} />}
+        {domainSwitch}
+      </aside>
+    );
+  };
   function reload() {
     refresh();
     caps.refresh();
@@ -161,11 +165,12 @@ function MailServerCard({
   };
 
   if (managed) return (
-    <section className="rounded-2xl bg-card p-4">
-      <div className="flex items-center gap-2.5">
-        <FeatureIllustration name="mail" className="illustration-color w-10 shrink-0" />
-        <h2 className="text-base font-medium">{t.emailsAdmin.overview.mailServer}</h2>
-      </div>
+    <details className="group rounded-2xl bg-card p-4">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium">
+        <UiIcon name="settings" className="size-4 text-muted-foreground" />
+        {t.emailsAdmin.advanced.protocolTitle}
+        <UiIcon name="chevron-down" className="ms-auto size-4 text-muted-foreground group-open:rotate-180" />
+      </summary>
       <p className="mt-4 text-xs text-muted-foreground">{t.emailsAdmin.overview.hostname}</p>
       <button type="button" onClick={copy} className="mt-1 flex max-w-full items-center gap-2 text-start text-sm font-medium hover:underline">
         <bdi className="break-all">{mailHost}</bdi><UiIcon name={copied ? "check" : "copy"} className="size-4 shrink-0 text-muted-foreground" />
@@ -174,7 +179,7 @@ function MailServerCard({
         <div><dt className="font-medium">IMAP 993</dt><dd className="text-xs text-muted-foreground">TLS</dd></div>
         <div><dt className="font-medium">SMTP 587</dt><dd className="text-xs text-muted-foreground">STARTTLS</dd></div>
       </dl>
-    </section>
+    </details>
   );
 
   const cta = webmailCta(webmail);

@@ -166,15 +166,23 @@ it.each([
     expect(request).not.toHaveBeenCalled();
 });
 
-it("opens the shared mail overview after activation and exposes the private IMAP and webmail endpoints", async () => {
+it("opens hosted webmail after activation and offers client settings once a mailbox exists", async () => {
   const service = {
     id: "managed-mail-test",
     placement: "standard",
-    hostname: "mail.slot.example.test",
+    hostname: "imap.slot.example.test",
     webmailUrl: "https://webmail.slot.example.test",
   };
   h.query = "mailView=mailboxes";
   h.activate.mockResolvedValue(service);
+  h.stats.mockResolvedValueOnce({
+    inbox: { total: 0, domains: [] },
+    domains: { total: 0, active: 0 },
+    mailboxes: { total: 0, active: 0 },
+    aliases: { total: 0 },
+    storageBytes: 0,
+    messages: 0,
+  });
   h.stats.mockResolvedValue({
     inbox: { total: 20, domains: [
       { domain: "example.test", messages: 13, mailboxes: [{ username: "hello@example.test", messages: 13 }] },
@@ -204,9 +212,19 @@ it("opens the shared mail overview after activation and exposes the private IMAP
   expect(pageHeader()).not.toContain("Shared mailboxes");
   await act(async () => activate!.click());
   expect(pageHeader()).toContain("Shared mailboxes");
-  expect(container.textContent).toContain("IMAP 993");
-  expect(container.textContent).toContain("mail.slot.example.test");
-  expect(container.querySelector('a[href="https://webmail.slot.example.test"]')).not.toBeNull();
+  const login = container.querySelector('a[aria-label="Open webmail (webmail.slot.example.test)"]');
+  expect(login?.textContent).toContain("webmail.slot.example.test");
+  expect(login?.getAttribute("href")).toBe("https://webmail.slot.example.test/");
+  expect(container.textContent).toContain("No domains yet");
+  expect(container.textContent).not.toContain(service.hostname);
+  expect(container.textContent).not.toContain("IMAP 993");
+  expect(h.identityUsage).toHaveBeenCalledExactlyOnceWith("senders");
+  await act(async () => container.querySelector<HTMLButtonElement>('section[aria-label="Mailbox activity"] button[aria-label="Refresh"]')!.click());
+  const settings = container.querySelector("details");
+  expect(settings?.open).toBe(false);
+  expect(settings?.querySelector("summary")?.textContent).toBe("Protocol settings");
+  expect(settings?.textContent).toContain("IMAP 993");
+  expect(settings?.textContent).toContain(service.hostname);
   expect(container.textContent).toContain("Mailboxes");
   expect(h.stats).toHaveBeenCalledWith(service.id, { inbox: true });
   expect(container.textContent).toContain("Inbox messages");
@@ -217,7 +235,6 @@ it("opens the shared mail overview after activation and exposes the private IMAP
   const studio = activity.querySelector('li[aria-label="hello@studio.test"]')!;
   expect(studio.querySelector("dd")?.textContent).toBe("7");
   expect(studio.querySelector("h3 a")?.getAttribute("href")).toContain("domain=studio.test");
-  expect(h.identityUsage).toHaveBeenCalledExactlyOnceWith("senders");
   const edit = studio.querySelector<HTMLButtonElement>(
     '[aria-label="Edit sending limit for hello@studio.test"]',
   )!;
@@ -286,7 +303,7 @@ it("opens the shared mail overview after activation and exposes the private IMAP
   });
   expect(h.setCap).toHaveBeenLastCalledWith("senders", "hello@studio.test", null);
   const sidebar = container.querySelector("aside")!;
-  expect(sidebar.textContent).toContain("Mail server");
+  expect(sidebar.textContent).toContain("Protocol settings");
   const filter = sidebar.querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]')!;
   await act(async () => filter.click());
   const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
@@ -297,7 +314,7 @@ it("opens the shared mail overview after activation and exposes the private IMAP
   expect(activity.querySelector("header")?.textContent).toContain("13 Inbox messages");
   expect(activity.querySelectorAll("li")).toHaveLength(1);
   expect(activity.querySelector('li[aria-label="hello@example.test"] dd')?.textContent).toBe("13");
-  expect(h.stats).toHaveBeenCalledTimes(1);
+  expect(h.stats).toHaveBeenCalledTimes(2);
   expect(h.registry).not.toHaveBeenCalled();
 });
 

@@ -196,6 +196,7 @@ it.each([true, false])("discovers active hosted domains through the public route
   const id = "managed-mail-" + crypto.randomUUID();
   const engine = {
     serverId: "worker-" + id, origin: "https://worker.example.test", token: "private-worker-token",
+    ...(shared && { publicHostname: "mx." + id + ".test" }),
     hostname: "mail." + id + ".test", webmailUrl: "https://webmail." + id + ".test",
     placement: shared ? "standard" as const : "dedicated" as const, prepare: false, shared,
   };
@@ -219,6 +220,10 @@ it.each([true, false])("discovers active hosted domains through the public route
   expect(h.discoveryMx).not.toHaveBeenCalled();
 
   h.discoveryTxt.mockResolvedValue([]);
+  if (shared) {
+    h.discoveryMx.mockResolvedValue([{ priority: 10, exchange: engine.publicHostname + "." }]);
+    expect(await (await lookup()).json()).toEqual({ webmailUrl: engine.webmailUrl });
+  }
   h.discoveryMx.mockResolvedValue([{ priority: 10, exchange: engine.hostname + "." }]);
   expect((await lookup()).status).toBe(200);
   worker.mockResolvedValueOnce(Response.json({ domain: { domain: "inbox.example.test", active: false } }));
@@ -228,7 +233,7 @@ it.each([true, false])("discovers active hosted domains through the public route
   h.discoveryMx.mockResolvedValue([{ priority: 0, exchange: "unassigned.test" }]);
   expect((await lookup()).status).toBe(404);
   expect((await lookup("alex@inbox.example.test")).status).toBe(400);
-  expect(worker).toHaveBeenCalledTimes(shared ? 4 : 6);
+  expect(worker).toHaveBeenCalledTimes(shared ? 5 : 6);
   if (!shared) {
     h.discoveryMx.mockResolvedValue([{ priority: 10, exchange: engine.hostname }]);
     verifiedUrl = null;

@@ -17,7 +17,7 @@ import { sshManager } from "../../../lib/ssh-manager";
 import { readState } from "../mail-state";
 import { provisionDomainDkim, genSecret } from "../mail.service";
 import { execute, queryOne, queryRows, q, qInt } from "./psql-runner";
-import { safeErrorMessage } from "@repo/core";
+import { publishedMailHostname, safeErrorMessage } from "@repo/core";
 import {
   buildDomainDnsRecords,
   recordDomainDns,
@@ -146,13 +146,6 @@ export async function createDomain(
   // records are about external senders finding the MX target and passing
   // SPF/DKIM/DMARC alignment.
   //
-  // The `mail.<installDomain>` MX target is the only hostname with an SSL
-  // cert + iRedMail config, so every additional domain shares it.
-  //
-  // DKIM provisioning is best-effort: if it fails, we still record the
-  // MX/SPF/DMARC banner so the operator can publish those, and the
-  // dnsWarning toast tells them what to fix.
-  // Self-hosted operators can request a postmaster for an additional domain.
   // On shared workers each mailbox is provisioned explicitly against the customer's plan.
   let postmasterPassword: string | undefined;
   let postmasterWarning: string | undefined;
@@ -180,10 +173,10 @@ export async function createDomain(
 
   let dnsWarning: string | undefined;
   try {
-    const { installDomain, dkimValue, dkimError, ipv4, ipv6, relayInclude } =
+    const { mailHost, dkimValue, dkimError, ipv4, ipv6, relayInclude } =
       await sshManager.withExecutor(serverId, async (exec) => {
         const state = await readState(exec);
-        const installDomain = state?.domain ?? null;
+        const mailHost = state?.domain ? publishedMailHostname(state.domain, state.dnsRecords) : null;
         // A domain added while the relay routes ALL domains (scope="all", or a
         // legacy relay with no scope) inherits the relay provider's SPF include
         // so it can send through the relay immediately. "selected"-scope relays
@@ -204,9 +197,9 @@ export async function createDomain(
         const ipv4 = typeof records?.a?.value === "string" ? records.a.value : null;
         const ipv6 =
           typeof records?.aaaa?.value === "string" ? records.aaaa.value : null;
-        if (!installDomain) {
+        if (!mailHost) {
           return {
-            installDomain: null,
+            mailHost: null,
             dkimValue: undefined,
             dkimError: undefined,
             ipv4,
@@ -216,11 +209,11 @@ export async function createDomain(
         }
         try {
           const dkimValue = await provisionDomainDkim(exec, domain);
-          return { installDomain, dkimValue, dkimError: undefined, ipv4, ipv6, relayInclude };
+          return { mailHost, dkimValue, dkimError: undefined, ipv4, ipv6, relayInclude };
         } catch (err) {
           observeCaughtError(err, "platform/engine/modules/mail/admin/domains.service");
           return {
-            installDomain,
+            mailHost,
             dkimValue: undefined,
             dkimError: safeErrorMessage(err),
             ipv4,
@@ -229,12 +222,12 @@ export async function createDomain(
           };
         }
       });
-    if (!installDomain) {
+    if (!mailHost) {
       dnsWarning =
         "Mail state file is missing the primary install domain - DNS records for the new domain were not generated. Re-run the mail install or contact support.";
     } else {
       const records = buildDomainDnsRecords(
-        installDomain,
+        mailHost,
         domain,
         dkimValue,
         ipv4,

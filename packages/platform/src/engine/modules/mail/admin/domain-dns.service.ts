@@ -25,19 +25,14 @@ import { readState, mutateState } from "../mail-state";
 import type { DnsRecordSet, AdditionalDomainDns } from "../mail-state";
 import { buildSpfValue } from "../mail.service";
 import { withSpfInclude } from "./outbound-relay.service";
-import { mailHostname } from "@repo/core";
 
 // ─── Record set construction ─────────────────────────────────────────────────
 
 /**
  * Compose the DNS-records bundle for an additional domain.
  *
- * The `installDomain` is the primary domain the mail server was provisioned
- * on (e.g. `oblien.com`). The MX record for any additional domain points
- * back to `mail.<installDomain>` since that's the only hostname with an MX
- * target + SSL cert. DKIM is optional - pass `dkimValue` when amavis has
- * been provisioned with a keypair for `newDomain`; omit it to surface a
- * 3-record banner (MX/SPF/DMARC).
+ * The MX target comes from the installation's published DNS settings.
+ * The domain's public DKIM key adds a TXT record when available.
  *
  * The optional `ipv4` / `ipv6` are the mail host's public IPs (the same
  * ones the primary install published as `A`/`AAAA` for `mail.<installDomain>`).
@@ -47,14 +42,13 @@ import { mailHostname } from "@repo/core";
  * for the primary install in step 11.
  */
 export function buildDomainDnsRecords(
-  installDomain: string,
+  mailHost: string,
   newDomain: string,
   dkimValue?: string,
   ipv4?: string | null,
   ipv6?: string | null,
   opts?: { spfInclude?: string },
 ): DnsRecordSet {
-  const mailHost = mailHostname(installDomain);
   // `spfInclude` is the outbound relay's provider token when one is active for
   // this domain — a no-op when absent, so direct-send domains are unaffected.
   const spfValue = withSpfInclude(buildSpfValue(ipv4, ipv6), opts?.spfInclude);

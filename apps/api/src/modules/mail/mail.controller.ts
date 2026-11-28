@@ -38,7 +38,7 @@ import { streamSSE } from "../../lib/sse";
 import { requestTag } from "../../middleware/error-handler";
 import { invalidatePlatformTransport } from "@repo/platform/engine/lib/mail";
 import { env } from "@repo/platform/engine/config/index";
-import { safeErrorMessage, DEFAULT_RETAIN_COUNT, mailHostname } from "@repo/core";
+import { safeErrorMessage, DEFAULT_RETAIN_COUNT, mailHostname, publishedMailHostname } from "@repo/core";
 import { sshManager } from "@repo/platform/engine/lib/ssh-manager";
 import { repos } from "@repo/db";
 import { getRequestContext, type RequestContext } from "../../lib/request-context";
@@ -62,6 +62,7 @@ import {
   type StepResult,
   type StepLogger,
   type BasicStepFn,
+  type stepDkimKeys,
   type InstallerStepFn,
   type SslStepFn,
   type IRedMailConfig,
@@ -178,12 +179,13 @@ function statusFromState(
   // convenience; that's gone. Operators reset via the Change flow whenever
   // they need a known password; the SSHA512 hash in vmail.mailbox is the
   // only source of truth.
-  const credentials = state.domain
+  const mailHost = state.domain ? publishedMailHostname(state.domain, state.dnsRecords) : undefined;
+  const credentials = mailHost
     ? {
         username: `postmaster@${state.domain}`,
-        smtpHost: mailHostname(state.domain),
+        smtpHost: mailHost,
         smtpPort: 587,
-        imapHost: mailHostname(state.domain),
+        imapHost: mailHost,
         imapPort: 993,
       }
     : undefined;
@@ -967,6 +969,10 @@ export async function startSetup(c: Context) {
                 await deliverBefore("mail", pinnedMailImage(), executor);
                 return (runner as InstallerStepFn)(executor, domain, log, installerConfig);
               });
+            }
+            if (stepDef.key === "dkim_keys") {
+              return sshManager.withExecutor(serverId, executor =>
+                (runner as typeof stepDkimKeys)(executor, domain, log, state.dnsRecords));
             }
             if (stepDef.key === "request_ssl") {
               // Issues through `platform.ssl`, which is resolved per SERVER — so

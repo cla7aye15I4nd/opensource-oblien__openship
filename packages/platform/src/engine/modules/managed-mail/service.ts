@@ -35,6 +35,7 @@ const engineSchema = z
     serverId: z.string().regex(/^[a-zA-Z0-9_-]+$/),
     token: z.string().min(1),
     hostname: hostname.toLowerCase().regex(/^mail\./),
+    publicHostname: hostname.toLowerCase().optional(),
     webmailUrl: z.url(),
     shared: z.boolean().optional(),
     cloudServerId: z.string().min(1).optional(),
@@ -85,6 +86,8 @@ export function mailEngines() {
     rows.some(
       (row) =>
         (row.shared && row.placement !== "standard") ||
+        (row.publicHostname && (!row.shared || rows.some(other => other !== row &&
+          (other.hostname === row.publicHostname || other.publicHostname === row.publicHostname)))) ||
         ((row.cloudServerId || row.providerVmId) && row.placement !== "dedicated") ||
         (row.providerVmId && row.cloudServerId) ||
         !secureOrigin(row.origin) ||
@@ -171,7 +174,10 @@ async function webmailLoginOrigin(engine: MailEngine): Promise<string | null> {
 
 /** DNS selects a possible assignment. Only the assigned worker can confirm hosting. */
 export async function hostedMailboxOrigin(selector: { id: string } | { hostname: string }, domain: string) {
-  const row = await repos.managedMail.discoverMailboxService(selector);
+  const shared = "hostname" in selector
+    ? mailEngines().find(engine => engine.shared && engine.publicHostname === selector.hostname)
+    : undefined;
+  const row = await repos.managedMail.discoverMailboxService(shared ? { hostname: shared.hostname } : selector);
   if (!row?.organizationId) return null;
   const engine = await boundEngine(row.organizationId, row);
   const path = "/admin/" + encodeURIComponent(engine.serverId) + "/domains/" + encodeURIComponent(domain);
@@ -221,7 +227,7 @@ async function summary(
     ...(row.placement === "dedicated" && target.mailboxStorageMB !== undefined
       ? { mailboxStorageMB: target.mailboxStorageMB }
       : {}),
-    hostname: target.hostname,
+    hostname: target.publicHostname ?? target.hostname,
     ...(row.order?.worker?.customerDns && { customerDns: row.order.worker.customerDns }),
     // The already-provisioned fleet address also works when the worker's control API is offline.
     webmailUrl: row.order?.webmailProjectId
@@ -250,7 +256,7 @@ export async function mailServiceSummary(
   const services = bindings.map((item) => ({
     id: item.id,
     placement: item.placement,
-    hostname: item.hostname ?? undefined,
+    hostname: item.shared ? undefined : item.hostname ?? undefined,
     plan: item.order?.plan,
     storageGB: item.order?.storageGB,
     pendingCheckout: item.orderState === "checkout",

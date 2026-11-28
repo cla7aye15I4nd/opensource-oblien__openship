@@ -14,6 +14,7 @@
  * diff the result against what's currently registered).
  */
 
+import { isValidCustomHostname } from "../../utils";
 import type {
   MailDnsRecord,
   MailRoute,
@@ -76,6 +77,17 @@ export const MAIL_HOST_LABEL = "mail";
  */
 export function mailHostname(userDomain: string): string {
   return `${MAIL_HOST_LABEL}.${userDomain}`;
+}
+
+/** The published MX can be an alias for the installation's own hostname. */
+export function publishedMailHostname(domain: string, records?: Record<string, unknown> | null): string {
+  const mx = records?.mx;
+  if (mx && typeof mx === "object" && "type" in mx && mx.type === "MX" &&
+      "value" in mx && typeof mx.value === "string") {
+    const host = mx.value.toLowerCase().replace(/\.$/, "");
+    if (!host.includes("*") && isValidCustomHostname(host)) return host;
+  }
+  return mailHostname(domain);
 }
 
 /** The Zero server's tRPC API host, fronted alongside the webmail UI. */
