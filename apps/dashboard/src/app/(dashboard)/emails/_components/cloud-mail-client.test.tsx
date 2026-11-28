@@ -199,7 +199,11 @@ it("opens the shared mail overview after activation and exposes the private IMAP
     (button) => button.textContent === "Activate mailboxes",
   );
   expect(activate).toBeDefined();
+  const pageHeader = () => container.querySelector("h1")?.closest("header")?.textContent;
+  expect(pageHeader()).toContain("Included with compute");
+  expect(pageHeader()).not.toContain("Shared mailboxes");
   await act(async () => activate!.click());
+  expect(pageHeader()).toContain("Shared mailboxes");
   expect(container.textContent).toContain("IMAP 993");
   expect(container.textContent).toContain("mail.slot.example.test");
   expect(container.querySelector('a[href="https://webmail.slot.example.test"]')).not.toBeNull();

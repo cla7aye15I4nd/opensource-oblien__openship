@@ -8,7 +8,7 @@ import { getActiveOrganizationId, subscribeActiveOrganization } from "@/lib/api/
 import { managedMailApi } from "@/lib/api/managed-mail";
 import { getApiErrorMessage } from "@/lib/api";
 import { useScopedMutation } from "@/hooks/use-scoped-resource";
-import { mailPlanLabel } from "@/components/billing/plan-presentation";
+import { mailPlanLabel, mailServiceLabel } from "@/components/billing/plan-presentation";
 import { Icon } from "@repo/ui/icons";
 import { DedicatedInboxSetup } from "./dedicated-inbox-setup";
 import { CloudMailSetup } from "./cloud-mail-setup";
@@ -178,7 +178,6 @@ function CloudMailService({
     (senderPlan && requestedView !== "dedicated") ||
     (!data?.plan && data?.sendingConfigured && requestedView === "sending")
   );
-  const placement = service?.placement ?? (data?.plan && !senderPlan ? (data.product === "dedicated" ? "dedicated" : "standard") : null);
   const access = !!data && !service && !data.plan && requestedView !== "dedicated";
   const backToMail = connecting || (sending && !senderPlan);
   const backHref = backToMail
@@ -256,9 +255,9 @@ function CloudMailService({
               </span>
             )}
           </div>
-          {!connecting && placement && requestedView !== "dedicated" && (
+          {!connecting && service && requestedView !== "dedicated" && (
             <p className="mt-1 text-sm text-muted-foreground">
-              {placement === "dedicated" ? copy.dedicatedTitle : copy.sharedTitle}
+              {mailServiceLabel("mailboxes", service.placement, copy)}
             </p>
           )}
         </div>
