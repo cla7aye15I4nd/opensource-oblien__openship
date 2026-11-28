@@ -104,6 +104,8 @@ Configure the Cloud API in `apps/api/.env.local-saas` for local testing or in th
 
 The origin is an Openship self-hosted **API** running this revision. The token belongs to the worker organization that owns the registered Linux target and can manage its mail server and webmail project. Keep it server-side. For local development a loopback HTTP API origin is supported.
 
+If the worker's network restricts DNS to its hosting provider, set `OPENSHIP_MAIL_DNS_RESOLVERS` on the worker API to a comma-separated list of that provider's recursive resolver IPs. Mail setup and DNS health checks use these for the published records. The defaults are `1.1.1.1` and `8.8.8.8`.
+
 For a disposable development target, build the updated webmail image on its Docker runtime from the repo root. The normal catalog deploy reuses the local image.
 
 ```sh
