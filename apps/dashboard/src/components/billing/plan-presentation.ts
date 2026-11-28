@@ -48,6 +48,20 @@ export function planCapacity(plan: ApiPlan) {
   return { cpu, memoryGb: ram / 1024, diskGb: disk };
 }
 
+export function mailAccountProduct(data: ManagedMailSummary | null | undefined) {
+  return data?.product ?? (data?.mailboxPlan === null ? "sending" : "mailboxes");
+}
+
+export function mailServiceLabel(
+  product: ManagedMailSummary["product"],
+  placement: NonNullable<ManagedMailSummary["service"]>["placement"] | undefined,
+  copy: Dictionary["emails"]["cloudClient"],
+) {
+  if (product === "sending") return copy.apiTitle;
+  if (placement === "dedicated" || product === "dedicated") return copy.dedicatedTitle;
+  return placement === "standard" ? copy.sharedTitle : copy.mailboxesLabel;
+}
+
 export function mailPlanLabel(name: ManagedMailSummary["plan"] | undefined, included: string) {
   return name === "included"
     ? included

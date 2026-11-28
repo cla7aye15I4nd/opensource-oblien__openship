@@ -20,7 +20,7 @@ import { managedMailApi } from "@/lib/api/managed-mail";
 import { mailDashboardHref, planResourceHref, type PlanResource, type PlanDetailTab } from "@/lib/billing-links";
 import { PlanDetailColumns, PlanDetailHeader, PlanDetailTabs } from "./PlanDetailLayout";
 import { OpenStripePortalButton } from "@/app/(dashboard)/billing/_components/OpenStripePortalButton";
-import { mailPlanFacts, mailPlanLabel } from "./plan-presentation";
+import { mailAccountProduct, mailPlanFacts, mailPlanLabel, mailServiceLabel } from "./plan-presentation";
 
 export function MailPlanDetails({
   resource,
@@ -36,9 +36,10 @@ export function MailPlanDetails({
     useCallback(() => managedMailApi.summary(serviceId), [serviceId]),
   );
   const data = account.data;
-  const product = data?.product ?? (data?.mailboxPlan === null ? "sending" : "mailboxes");
-  const productName =
-    product === "dedicated" ? c.dedicatedTitle : product === "sending" ? c.apiTitle : c.sharedTitle;
+  const product = mailAccountProduct(data);
+  const productName = mailServiceLabel(product, data?.service?.placement, c);
+  const service = data?.service;
+  const dedicatedWebmail = service?.placement === "dedicated" && !service.provisioning ? service.webmailUrl : null;
   const plan = data?.plan && mailPlanLabel(data.plan, c.included);
   const payments = serviceId ? !!data?.subscriptionTarget : !!data?.hasBillingAccount;
   const activeTab = tab === "usage" || (tab === "payment" && payments) ? tab : "overview";
@@ -133,13 +134,14 @@ export function MailPlanDetails({
                 <h2 className="text-lg font-medium">{c.title}</h2>
                 {(plan || data.service) && (
                   <p className="text-sm text-muted-foreground">
-                    {data.service && !data.service.provisioning
-                      ? data.service.hostname
-                      : product === "dedicated"
-                        ? c.dedicatedDescription
-                        : product === "sending"
-                          ? c.verifySender
-                          : c.includedInboxDescription}
+                    {dedicatedWebmail ? (
+                      <>
+                        {t.emailsAdmin.overview.webmailAt}{" "}
+                        <a href={dedicatedWebmail} target="_blank" rel="noopener noreferrer" className="break-all text-foreground hover:underline">
+                          {new URL(dedicatedWebmail).host}
+                        </a>
+                      </>
+                    ) : product === "sending" ? c.verifySender : c.includedInboxDescription}
                   </p>
                 )}
                 <Button asChild variant="secondary">
