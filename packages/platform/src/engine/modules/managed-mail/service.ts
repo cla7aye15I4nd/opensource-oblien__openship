@@ -23,6 +23,7 @@ import {
   paidEmailPlan,
   mailCheckoutSummary,
   mailEntitlements,
+  sharedMailActivationEnabled,
   mailEntitlement,
   sendingNamespace,
 } from "./billing";
@@ -96,6 +97,14 @@ export function mailEngines() {
   )
     throw configError();
   return rows;
+}
+
+function availableMailEngines(org: string) {
+  if (!sharedMailActivationEnabled(org)) return [];
+  return mailEngines().filter(engine =>
+    !engine.cloudServerId && !engine.providerVmId &&
+    (env.OPENSHIP_MAIL_HOSTED_ENROLLMENT_ENABLED || engine.shared)
+  );
 }
 
 export async function requireMailEntitlement(org: string, serviceId?: string) {
@@ -273,12 +282,8 @@ export async function mailServiceSummary(
       dedicatedEnrollmentEnabled: dedicatedMailEnrollmentEnabled(org),
     };
   }
-  const inventory = service || !env.OPENSHIP_MAIL_HOSTED_ENROLLMENT_ENABLED ? [] : mailEngines();
-  const slots = inventory.filter(
-    (engine) =>
-      !engine.cloudServerId &&
-      !engine.providerVmId &&
-      (engine.placement === "standard" || mailboxGrant?.dedicated),
+  const slots = service ? [] : availableMailEngines(org).filter(
+    engine => engine.placement === "standard" || mailboxGrant?.dedicated,
   );
   const occupancy = await Promise.all(
     slots.map((engine) =>
@@ -361,7 +366,7 @@ export async function activateMailService(
         );
       return summary(org, existing);
     }
-    assertHostedMailEnrollment();
+    if (placement !== "standard" || !sharedMailActivationEnabled(org)) assertHostedMailEnrollment();
     const grant = await requireMailEntitlement(org);
     if (cloudServerId)
       throw new AppError("Choose a new dedicated mail server in Email plans.", 409);
@@ -371,9 +376,7 @@ export async function activateMailService(
         402,
         "MAIL_DEDICATED_REQUIRED",
       );
-    for (const engine of mailEngines().filter(
-      (item) => item.placement === placement && !item.cloudServerId && !item.providerVmId,
-    )) {
+    for (const engine of availableMailEngines(org).filter(item => item.placement === placement)) {
       const slot = engineIdentity(engine);
       const lock = "managed-mail:slot:" + slot;
       const reserve = async () => {

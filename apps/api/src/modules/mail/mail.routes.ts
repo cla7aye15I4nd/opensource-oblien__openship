@@ -71,7 +71,7 @@ for (const sendingPath of [
 
 /* ── Setup wizard ─────────────────────────────────────────────────── */
 r.get("/steps", { tag: "mail_server:read", mcp: { description: "Read the ordered mail installation steps. Installing a new mail stack uses the dashboard’s streaming setup wizard." } }, mail.getSteps);
-r.get("/status", { tag: "mail_server:read", mcp: { description: "Read saved setup progress for query.serverId. A missing state after an SSH failure is not proof that mail is uninstalled; check the mail health tool for live reachability." }, query: MailRequestSchemas.status }, mail.getStatus);
+r.get("/status", { tag: "mail_server:read", queryResourceId: "serverId", mcp: { description: "Read saved setup progress for query.serverId. A missing state after an SSH failure is not proof that mail is uninstalled; check the mail health tool for live reachability." }, query: MailRequestSchemas.status }, mail.getStatus);
 // Cross-server mail-install summary - lets the /emails page auto-select
 // the only mail server when there's exactly one.
 r.get("/servers", { tag: "mail_server:list", mcp: { description: "List mail servers managed by this workspace, their installation state and linked webmail projects." } }, mail.listMailServers);

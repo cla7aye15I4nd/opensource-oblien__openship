@@ -580,6 +580,18 @@ describe("scanDns PTR under a relay", () => {
 });
 
 describe("resolver selection", () => {
+  test("uses the mail worker's configured public resolvers for internet-view DNS checks", async () => {
+    vi.stubEnv("OPENSHIP_MAIL_DNS_RESOLVERS", "185.12.64.1, 185.12.64.2");
+    try {
+      vi.resetModules();
+      dns.setServers.mockClear();
+      await import("../../../src/modules/mail/admin/dns-scan.service");
+      expect(dns.setServers).toHaveBeenCalledWith(["185.12.64.1", "185.12.64.2"]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   test("scans public resolvers, not the host's stub", async () => {
     // The mail host's /etc/hosts carries `127.0.1.1 mail.<domain>` (written by
     // the hostname step), which the system stub would synthesize into an A

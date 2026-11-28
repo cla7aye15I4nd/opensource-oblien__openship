@@ -313,6 +313,8 @@ export interface PermissionSpec {
    * when your route uses a non-standard param name.
    */
   ids?: Partial<Record<string, string>>;
+  /** Read the leaf resource ID from this query field when the route has no path ID. */
+  queryResourceId?: string;
   /**
    * Opt out of the route-scanner's "mutation method must use write/admin"
    * check. Set true ONLY when the handler is genuinely side-effect-free
@@ -687,7 +689,7 @@ export function requirePermission(spec: PermissionSpec): MiddlewareHandler {
       // org-singleton scope when the URL has no param.
       const leafParamName =
         idsMap[parsed.leaf] ?? DEFAULT_ID_PARAMS[parsed.leaf] ?? "id";
-      leafId = c.req.param(leafParamName);
+      leafId = c.req.param(leafParamName) ?? (spec.queryResourceId ? c.req.query(spec.queryResourceId) : undefined);
       if (!leafId) {
         if (CONDITIONAL_SINGLETON_RESOURCES.has(parsed.leaf as string)) {
           await permission.assert(getRequestContext(c), {

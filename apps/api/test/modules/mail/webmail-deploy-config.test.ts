@@ -2,6 +2,7 @@ import "./_setup-env";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { initPlatform, resetPlatform } from "@repo/adapters";
 import { getAppTemplate } from "@repo/core";
+import { seedScopedToken } from "../audit/_harness";
 import { repos, seedOwner, seedServer } from "../jobs/_harness";
 import { decrypt } from "@repo/platform/engine/lib/encryption";
 import { updateService } from "@repo/platform/engine/modules/services/service.service";
@@ -220,6 +221,17 @@ describe("webmail link recovery", () => {
     const after = await client.mail.getStatus({ serverId });
     expect(after.webmail?.projectId).toBe(first.projectId);
     expect(after.webmailRecoveryCandidates).toBeUndefined();
+  });
+
+  it("allows a mail worker token to read only its named server status", async () => {
+    const { owner, serverId } = await prepared();
+    const secondServerId = await seedServer(owner.orgId);
+    const { auth } = await seedScopedToken(owner, [{ resourceType: "mail_server", resourceId: serverId, permissions: ["read"] }]);
+    const app = new Hono().onError(handleApiError).route("/api/mail", mailRoutes);
+    const status = (query: string) => app.request("/api/mail/status" + query, { headers: auth });
+    expect((await status("?serverId=" + serverId)).status).toBe(200);
+    expect((await status("?serverId=" + secondServerId)).status).toBe(404);
+    expect((await status("")).status).toBe(404);
   });
 
   it("treats a failed linked-project lookup as unavailable rather than installing a duplicate", async () => {

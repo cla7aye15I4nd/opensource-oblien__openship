@@ -4,7 +4,9 @@ Openship Mail owns inbound SMTP, Dovecot IMAP, mailbox data and webmail. The Ema
 
 New hosted mailbox purchases and first-time host assignments require `OPENSHIP_MAIL_HOSTED_ENROLLMENT_ENABLED=true` on the Cloud API. Leave it off for a sending-only rollout. Existing hosts, funded orders, Email API purchases and compute billing keep their normal lifecycle.
 
-For a dedicated pilot while public enrollment is closed, set `OPENSHIP_MAIL_DEDICATED_PILOT_ORGS` on the Cloud API to a comma-separated list of production workspace IDs. Those workspaces can buy and resume dedicated orders through the normal paid checkout. Shared mailbox enrollment stays closed.
+For a dedicated pilot while public enrollment is closed, set `OPENSHIP_MAIL_DEDICATED_PILOT_ORGS` on the Cloud API to a comma-separated list of production workspace IDs. Those workspaces can buy and resume dedicated orders through the normal paid checkout. Shared mailbox checkout has its own release gate.
+
+For a shared pilot, set `OPENSHIP_MAIL_SHARED_PILOT_ORGS` to the eligible workspace IDs. Each workspace needs a current mailbox entitlement and an available shared engine in `OPENSHIP_MAIL_ENGINES`. The **Mailboxes** tab then offers activation through the normal tenant provisioning flow.
 
 ## Run locally
 
@@ -101,6 +103,8 @@ Configure the Cloud API in `apps/api/.env.local-saas` for local testing or in th
 ```
 
 The origin is an Openship self-hosted **API** running this revision. The token belongs to the worker organization that owns the registered Linux target and can manage its mail server and webmail project. Keep it server-side. For local development a loopback HTTP API origin is supported.
+
+If the worker's network restricts DNS to its hosting provider, set `OPENSHIP_MAIL_DNS_RESOLVERS` on the worker API to a comma-separated list of that provider's recursive resolver IPs. Mail setup and DNS health checks use these for the published records. The defaults are `1.1.1.1` and `8.8.8.8`.
 
 For a disposable development target, build the updated webmail image on its Docker runtime from the repo root. The normal catalog deploy reuses the local image.
 
