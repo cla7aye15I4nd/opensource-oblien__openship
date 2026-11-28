@@ -51,9 +51,11 @@ Existing standalone mail installations continue to use their original project. C
 
 ### Publish the shared webmail sign-in
 
-Use a separate installation domain for the shared engine so the operator can host its own corporate mailboxes on a dedicated service. For example, installing the shared engine for `shared.example.net` gives it the technical hostname `mail.shared.example.net`. Point that hostname at the mail VM and use it as the MX target for customer domains assigned to this worker. The VM accepts inbound SMTP on port 25 and mailbox logins over TLS on port 993.
+Use a separate installation domain for the shared engine so the operator can host its own corporate mailboxes on a dedicated service. For example, installing the shared engine for `shared.example.net` gives it the technical hostname `mail.shared.example.net`. Point that hostname at the mail VM. By default, shared customers use it as their MX target. The VM accepts inbound SMTP on port 25 and mailbox logins over TLS on port 993.
 
 In the worker’s Emails dashboard, open **Deploy webmail** for that engine. Give the linked Webmail app the public hostname, for example `mail.example.net`, and route HTTPS for that name to the app. In the SaaS API’s `OPENSHIP_MAIL_ENGINES` entry, use `mail.shared.example.net` for `hostname` and `https://mail.example.net` for `webmailUrl`. The worker verifies the linked app’s origin and IMAP host before accepting a shared assignment.
+
+To use the public webmail hostname for shared mail delivery too, point its A or AAAA record directly to the shared engine and include the hostname on its mail TLS certificate. Set the shared installation’s published MX and the fleet entry’s `publicHostname` to that name. Customer domain setup, mail clients and desktop discovery then use the public address.
 
 Each fleet entry has its own webmail origin. The shared sign-in opens the inboxes on that engine. Users on a dedicated VM reach their installation through **Open webmail** in the Cloud dashboard. The operator can assign its corporate domain’s MX to its dedicated VM independently of the public sign-in hostname.
 
