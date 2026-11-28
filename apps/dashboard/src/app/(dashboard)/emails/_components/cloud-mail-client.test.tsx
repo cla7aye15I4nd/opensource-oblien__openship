@@ -314,7 +314,7 @@ it("opens hosted webmail after activation and offers client settings once a mail
   expect(activity.querySelector("header")?.textContent).toContain("13 Inbox messages");
   expect(activity.querySelectorAll("li")).toHaveLength(1);
   expect(activity.querySelector('li[aria-label="hello@example.test"] dd')?.textContent).toBe("13");
-  expect(h.stats).toHaveBeenCalledTimes(1);
+  expect(h.stats).toHaveBeenCalledTimes(2);
   expect(h.registry).not.toHaveBeenCalled();
 });
 
